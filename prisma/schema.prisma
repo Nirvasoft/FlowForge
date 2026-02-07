@@ -1,0 +1,959 @@
+// FlowForge Database Schema
+// Multi-tenant workflow management platform
+// PostgreSQL with Row-Level Security (RLS)
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions", "multiSchema"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgcrypto]
+}
+
+// ============================================================================
+// ACCOUNT & TENANT MANAGEMENT
+// ============================================================================
+
+model Account {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @db.VarChar(200)
+  slug        String   @unique @db.VarChar(50)
+  domain      String?  @db.VarChar(255)
+  logo        String?  @db.Text
+  settings    Json     @default("{}")
+  plan        Plan     @default(FREE)
+  status      AccountStatus @default(ACTIVE)
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  users       User[]
+  groups      Group[]
+  roles       Role[]
+  invitations Invitation[]
+  apiKeys     ApiKey[]
+  auditLogs   AuditLog[]
+  
+  // Apps & Workflows
+  apps        App[]
+  processes   Process[]
+  forms       Form[]
+  datasets    Dataset[]
+  decisionTables DecisionTable[]
+  dashboards  Dashboard[]
+  connectors  Connector[]
+  
+  @@map("accounts")
+}
+
+enum Plan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+// ============================================================================
+// USER MANAGEMENT
+// ============================================================================
+
+model User {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId       String    @map("account_id") @db.Uuid
+  email           String    @db.VarChar(255)
+  passwordHash    String?   @map("password_hash") @db.VarChar(255)
+  
+  // Profile
+  firstName       String    @map("first_name") @db.VarChar(100)
+  lastName        String    @map("last_name") @db.VarChar(100)
+  displayName     String?   @map("display_name") @db.VarChar(200)
+  avatar          String?   @db.Text
+  phone           String?   @db.VarChar(50)
+  timezone        String    @default("UTC") @db.VarChar(50)
+  locale          String    @default("en") @db.VarChar(10)
+  
+  // Status
+  status          UserStatus @default(PENDING)
+  emailVerified   Boolean   @default(false) @map("email_verified")
+  lastLoginAt     DateTime? @map("last_login_at")
+  lastActiveAt    DateTime? @map("last_active_at")
+  
+  // MFA
+  mfaEnabled      Boolean   @default(false) @map("mfa_enabled")
+  mfaSecret       String?   @map("mfa_secret") @db.VarChar(255)
+  
+  // Preferences
+  preferences     Json      @default("{}")
+  notificationPrefs Json    @default("{}") @map("notification_prefs")
+  
+  // Timestamps
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  createdBy       String?   @map("created_by") @db.Uuid
+  
+  // Relations
+  account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  sessions        Session[]
+  oauthAccounts   OAuthAccount[]
+  groupMemberships GroupMember[]
+  roleAssignments UserRole[]
+  
+  // Workflow relations
+  assignedTasks   TaskInstance[] @relation("AssignedTasks")
+  createdProcesses ProcessInstance[] @relation("CreatedProcesses")
+  
+  // Audit
+  auditLogs       AuditLog[]
+  
+  @@unique([accountId, email])
+  @@index([accountId])
+  @@index([email])
+  @@index([status])
+  @@map("users")
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model Session {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  token         String   @unique @db.VarChar(500)
+  refreshToken  String   @unique @map("refresh_token") @db.VarChar(500)
+  
+  // Session info
+  userAgent     String?  @map("user_agent") @db.Text
+  ipAddress     String?  @map("ip_address") @db.VarChar(45)
+  
+  // Timestamps
+  expiresAt     DateTime @map("expires_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  lastUsedAt    DateTime @default(now()) @map("last_used_at")
+  
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model OAuthAccount {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  provider        String   @db.VarChar(50) // google, microsoft, okta, etc.
+  providerUserId  String   @map("provider_user_id") @db.VarChar(255)
+  accessToken     String?  @map("access_token") @db.Text
+  refreshToken    String?  @map("refresh_token") @db.Text
+  expiresAt       DateTime? @map("expires_at")
+  
+  // Timestamps
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+model Invitation {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId   String   @map("account_id") @db.Uuid
+  email       String   @db.VarChar(255)
+  token       String   @unique @db.VarChar(255)
+  roleId      String?  @map("role_id") @db.Uuid
+  groupIds    String[] @map("group_ids") @db.Uuid
+  
+  // Status
+  status      InvitationStatus @default(PENDING)
+  expiresAt   DateTime @map("expires_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String   @map("created_by") @db.Uuid
+  
+  // Relations
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  role        Role?    @relation(fields: [roleId], references: [id])
+  
+  @@index([accountId])
+  @@index([token])
+  @@index([email])
+  @@map("invitations")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+// ============================================================================
+// GROUPS & ROLES (RBAC)
+// ============================================================================
+
+model Group {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId   String   @map("account_id") @db.Uuid
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  type        GroupType @default(STATIC)
+  
+  // For dynamic groups
+  rules       Json?    // Rules for automatic membership
+  
+  // Hierarchy
+  parentId    String?  @map("parent_id") @db.Uuid
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  
+  // Relations
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  parent      Group?   @relation("GroupHierarchy", fields: [parentId], references: [id])
+  children    Group[]  @relation("GroupHierarchy")
+  members     GroupMember[]
+  roleAssignments GroupRole[]
+  
+  @@unique([accountId, name])
+  @@index([accountId])
+  @@map("groups")
+}
+
+enum GroupType {
+  STATIC
+  DYNAMIC
+}
+
+model GroupMember {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  groupId   String   @map("group_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  
+  // Relations
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([groupId, userId])
+  @@map("group_members")
+}
+
+model Role {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId   String   @map("account_id") @db.Uuid
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  isSystem    Boolean  @default(false) @map("is_system")
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  permissions RolePermission[]
+  userAssignments UserRole[]
+  groupAssignments GroupRole[]
+  invitations Invitation[]
+  
+  @@unique([accountId, name])
+  @@index([accountId])
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  resource    String   @db.VarChar(100) // e.g., "users", "processes", "forms"
+  action      String   @db.VarChar(50)  // e.g., "create", "read", "update", "delete"
+  description String?  @db.Text
+  
+  // Relations
+  rolePermissions RolePermission[]
+  
+  @@unique([resource, action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
+  
+  // Optional conditions (JSON for fine-grained control)
+  conditions   Json?
+  
+  // Relations
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model GroupRole {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  groupId   String   @map("group_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.Uuid
+  
+  // Relations
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  @@unique([groupId, roleId])
+  @@map("group_roles")
+}
+
+// ============================================================================
+// API KEYS & SERVICE ACCOUNTS
+// ============================================================================
+
+model ApiKey {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId   String   @map("account_id") @db.Uuid
+  name        String   @db.VarChar(100)
+  keyHash     String   @unique @map("key_hash") @db.VarChar(255)
+  keyPrefix   String   @map("key_prefix") @db.VarChar(10) // First few chars for identification
+  
+  // Permissions
+  scopes      String[] // e.g., ["processes:read", "forms:write"]
+  
+  // Security
+  ipWhitelist String[] @map("ip_whitelist")
+  
+  // Usage
+  lastUsedAt  DateTime? @map("last_used_at")
+  usageCount  Int       @default(0) @map("usage_count")
+  
+  // Expiration
+  expiresAt   DateTime? @map("expires_at")
+  
+  // Status
+  status      ApiKeyStatus @default(ACTIVE)
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String   @map("created_by") @db.Uuid
+  
+  // Relations
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  @@index([accountId])
+  @@index([keyHash])
+  @@map("api_keys")
+}
+
+enum ApiKeyStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+// ============================================================================
+// APPS (Low-Code Application Builder)
+// ============================================================================
+
+model App {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId   String   @map("account_id") @db.Uuid
+  name        String   @db.VarChar(100)
+  slug        String   @db.VarChar(50)
+  description String?  @db.Text
+  icon        String?  @db.VarChar(50)
+  
+  // App definition
+  definition  Json     @default("{}")
+  settings    Json     @default("{}")
+  permissions Json     @default("{}")
+  
+  // Versioning
+  version     Int      @default(1)
+  status      AppStatus @default(DRAFT)
+  publishedAt DateTime? @map("published_at")
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   String   @map("created_by") @db.Uuid
+  
+  // Relations
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  pages       AppPage[]
+  versions    AppVersion[]
+  
+  @@unique([accountId, slug])
+  @@index([accountId])
+  @@map("apps")
+}
+
+enum AppStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model AppPage {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  appId       String   @map("app_id") @db.Uuid
+  name        String   @db.VarChar(100)
+  route       String   @db.VarChar(200)
+  
+  // Page definition
+  layout      Json     @default("{}")
+  dataSources Json     @default("[]") @map("data_sources")
+  permissions Json     @default("{}")
+  
+  // SEO
+  title       String?  @db.VarChar(200)
+  description String?  @db.Text
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  app         App      @relation(fields: [appId], references: [id], onDelete: Cascade)
+  
+  @@unique([appId, route])
+  @@index([appId])
+  @@map("app_pages")
+}
+
+model AppVersion {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  appId       String   @map("app_id") @db.Uuid
+  version     Int
+  definition  Json
+  changelog   String?  @db.Text
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String   @map("created_by") @db.Uuid
+  
+  // Relations
+  app         App      @relation(fields: [appId], references: [id], onDelete: Cascade)
+  
+  @@unique([appId, version])
+  @@map("app_versions")
+}
+
+// ============================================================================
+// FORMS
+// ============================================================================
+
+model Form {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId     String   @map("account_id") @db.Uuid
+  name          String   @db.VarChar(200)
+  description   String?  @db.Text
+  
+  // Form definition
+  fields        Json     @default("[]")
+  layout        Json     @default("{}")
+  validationRules Json   @default("[]") @map("validation_rules")
+  conditionalLogic Json  @default("[]") @map("conditional_logic")
+  
+  // Settings
+  settings      Json     @default("{}")
+  permissions   Json     @default("{}")
+  
+  // Versioning
+  version       Int      @default(1)
+  status        FormStatus @default(DRAFT)
+  
+  // Timestamps
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdBy     String   @map("created_by") @db.Uuid
+  
+  // Relations
+  account       Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  submissions   FormSubmission[]
+  
+  @@index([accountId])
+  @@map("forms")
+}
+
+enum FormStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model FormSubmission {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  formId      String   @map("form_id") @db.Uuid
+  data        Json
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  
+  // Relations
+  form        Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  
+  @@index([formId])
+  @@index([createdAt])
+  @@map("form_submissions")
+}
+
+// ============================================================================
+// PROCESSES (Workflow Engine)
+// ============================================================================
+
+model Process {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId   String   @map("account_id") @db.Uuid
+  name        String   @db.VarChar(200)
+  description String?  @db.Text
+  category    String?  @db.VarChar(100)
+  
+  // Process definition (BPMN-like)
+  definition  Json     @default("{}")
+  variables   Json     @default("[]")
+  triggers    Json     @default("[]")
+  
+  // Settings
+  settings    Json     @default("{}")
+  permissions Json     @default("{}")
+  slaConfig   Json     @default("{}") @map("sla_config")
+  
+  // Versioning
+  version     Int      @default(1)
+  status      ProcessStatus @default(DRAFT)
+  publishedAt DateTime? @map("published_at")
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   String   @map("created_by") @db.Uuid
+  
+  // Relations
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  instances   ProcessInstance[]
+  versions    ProcessVersion[]
+  
+  @@index([accountId])
+  @@index([status])
+  @@map("processes")
+}
+
+enum ProcessStatus {
+  DRAFT
+  ACTIVE
+  DEPRECATED
+  ARCHIVED
+}
+
+model ProcessVersion {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  processId   String   @map("process_id") @db.Uuid
+  version     Int
+  definition  Json
+  changelog   String?  @db.Text
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String   @map("created_by") @db.Uuid
+  
+  // Relations
+  process     Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+  
+  @@unique([processId, version])
+  @@map("process_versions")
+}
+
+model ProcessInstance {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  processId        String   @map("process_id") @db.Uuid
+  processVersion   Int      @map("process_version")
+  
+  // Execution state
+  status           InstanceStatus @default(RUNNING)
+  currentNodes     String[] @map("current_nodes") // Active node IDs
+  variables        Json     @default("{}")
+  
+  // Tracking
+  startedAt        DateTime @default(now()) @map("started_at")
+  completedAt      DateTime? @map("completed_at")
+  dueAt            DateTime? @map("due_at")
+  
+  // Initiator
+  startedBy        String   @map("started_by") @db.Uuid
+  
+  // Relations
+  process          Process  @relation(fields: [processId], references: [id])
+  initiator        User     @relation("CreatedProcesses", fields: [startedBy], references: [id])
+  tasks            TaskInstance[]
+  nodeExecutions   NodeExecution[]
+  
+  @@index([processId])
+  @@index([status])
+  @@index([startedBy])
+  @@map("process_instances")
+}
+
+enum InstanceStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  SUSPENDED
+}
+
+model NodeExecution {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  instanceId      String   @map("instance_id") @db.Uuid
+  nodeId          String   @map("node_id") @db.VarChar(100) // Reference to node in definition
+  nodeType        String   @map("node_type") @db.VarChar(50)
+  
+  // Execution state
+  status          NodeStatus @default(PENDING)
+  input           Json      @default("{}")
+  output          Json      @default("{}")
+  error           Json?
+  
+  // Timestamps
+  startedAt       DateTime? @map("started_at")
+  completedAt     DateTime? @map("completed_at")
+  
+  // Relations
+  instance        ProcessInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  
+  @@index([instanceId])
+  @@index([nodeId])
+  @@map("node_executions")
+}
+
+enum NodeStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+model TaskInstance {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  instanceId      String   @map("instance_id") @db.Uuid
+  nodeId          String   @map("node_id") @db.VarChar(100)
+  
+  // Task info
+  name            String   @db.VarChar(200)
+  description     String?  @db.Text
+  taskType        TaskType @map("task_type") @default(TASK)
+  
+  // Assignment
+  assigneeId      String?  @map("assignee_id") @db.Uuid
+  assigneeType    AssigneeType @map("assignee_type") @default(USER)
+  candidateUsers  String[] @map("candidate_users") @db.Uuid
+  candidateGroups String[] @map("candidate_groups") @db.Uuid
+  
+  // Form data
+  formId          String?  @map("form_id") @db.Uuid
+  formData        Json     @default("{}") @map("form_data")
+  
+  // Status
+  status          TaskStatus @default(PENDING)
+  priority        Int       @default(0)
+  
+  // SLA
+  dueAt           DateTime? @map("due_at")
+  slaBreached     Boolean   @default(false) @map("sla_breached")
+  
+  // Completion
+  outcome         String?   @db.VarChar(100) // approved, rejected, completed, etc.
+  completedAt     DateTime? @map("completed_at")
+  completedBy     String?   @map("completed_by") @db.Uuid
+  comments        String?   @db.Text
+  
+  // Timestamps
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  
+  // Relations
+  instance        ProcessInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  assignee        User?     @relation("AssignedTasks", fields: [assigneeId], references: [id])
+  
+  @@index([instanceId])
+  @@index([assigneeId])
+  @@index([status])
+  @@index([dueAt])
+  @@map("task_instances")
+}
+
+enum TaskType {
+  TASK
+  APPROVAL
+  REVIEW
+  NOTIFICATION
+}
+
+enum TaskStatus {
+  PENDING
+  CLAIMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  ESCALATED
+}
+
+enum AssigneeType {
+  USER
+  GROUP
+  ROLE
+}
+
+// ============================================================================
+// DATASETS
+// ============================================================================
+
+model Dataset {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId   String   @map("account_id") @db.Uuid
+  name        String   @db.VarChar(200)
+  description String?  @db.Text
+  
+  // Schema definition
+  schema      Json     @default("[]") // Field definitions
+  indexes     Json     @default("[]")
+  constraints Json     @default("[]")
+  
+  // Settings
+  settings    Json     @default("{}")
+  permissions Json     @default("{}")
+  
+  // Stats
+  rowCount    BigInt   @default(0) @map("row_count")
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   String   @map("created_by") @db.Uuid
+  
+  // Relations
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  records     DatasetRecord[]
+  
+  @@unique([accountId, name])
+  @@index([accountId])
+  @@map("datasets")
+}
+
+model DatasetRecord {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  datasetId   String   @map("dataset_id") @db.Uuid
+  data        Json
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   String?  @map("created_by") @db.Uuid
+  updatedBy   String?  @map("updated_by") @db.Uuid
+  
+  // Relations
+  dataset     Dataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  
+  @@index([datasetId])
+  @@map("dataset_records")
+}
+
+// ============================================================================
+// DECISION TABLES
+// ============================================================================
+
+model DecisionTable {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId   String   @map("account_id") @db.Uuid
+  name        String   @db.VarChar(200)
+  description String?  @db.Text
+  
+  // Decision table definition
+  inputSchema Json     @map("input_schema") @default("[]")
+  outputSchema Json    @map("output_schema") @default("[]")
+  rules       Json     @default("[]")
+  hitPolicy   HitPolicy @map("hit_policy") @default(FIRST)
+  
+  // Versioning
+  version     Int      @default(1)
+  status      DecisionTableStatus @default(DRAFT)
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   String   @map("created_by") @db.Uuid
+  
+  // Relations
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  @@index([accountId])
+  @@map("decision_tables")
+}
+
+enum HitPolicy {
+  FIRST
+  ANY
+  UNIQUE
+  COLLECT
+  PRIORITY
+  OUTPUT_ORDER
+}
+
+enum DecisionTableStatus {
+  DRAFT
+  ACTIVE
+  DEPRECATED
+}
+
+// ============================================================================
+// DASHBOARDS & ANALYTICS
+// ============================================================================
+
+model Dashboard {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId   String   @map("account_id") @db.Uuid
+  name        String   @db.VarChar(200)
+  description String?  @db.Text
+  
+  // Dashboard definition
+  layout      Json     @default("[]")
+  widgets     Json     @default("[]")
+  filters     Json     @default("[]")
+  
+  // Settings
+  refreshInterval Int? @map("refresh_interval") // seconds
+  permissions Json     @default("{}")
+  isDefault   Boolean  @default(false) @map("is_default")
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   String   @map("created_by") @db.Uuid
+  
+  // Relations
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  @@index([accountId])
+  @@map("dashboards")
+}
+
+// ============================================================================
+// INTEGRATIONS & CONNECTORS
+// ============================================================================
+
+model Connector {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId   String   @map("account_id") @db.Uuid
+  name        String   @db.VarChar(200)
+  type        String   @db.VarChar(50) // salesforce, google, microsoft, rest, etc.
+  
+  // Configuration (encrypted)
+  config      Json     @default("{}")
+  credentials Json     @default("{}") // Encrypted
+  
+  // Status
+  status      ConnectorStatus @default(DISCONNECTED)
+  lastSyncAt  DateTime? @map("last_sync_at")
+  errorDetails Json?    @map("error_details")
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   String   @map("created_by") @db.Uuid
+  
+  // Relations
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  @@index([accountId])
+  @@map("connectors")
+}
+
+enum ConnectorStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+}
+
+// ============================================================================
+// AUDIT LOG
+// ============================================================================
+
+model AuditLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId   String   @map("account_id") @db.Uuid
+  userId      String?  @map("user_id") @db.Uuid
+  
+  // Event details
+  action      String   @db.VarChar(100) // e.g., "user.created", "process.started"
+  resource    String   @db.VarChar(100)
+  resourceId  String?  @map("resource_id") @db.Uuid
+  
+  // Change data
+  oldData     Json?    @map("old_data")
+  newData     Json?    @map("new_data")
+  
+  // Request context
+  ipAddress   String?  @map("ip_address") @db.VarChar(45)
+  userAgent   String?  @map("user_agent") @db.Text
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  user        User?    @relation(fields: [userId], references: [id])
+  
+  @@index([accountId])
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
