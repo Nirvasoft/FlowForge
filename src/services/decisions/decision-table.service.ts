@@ -865,3 +865,117 @@ export async function seedPOApprovalMatrix(): Promise<void> {
   await decisionTableService.publishTable(table.id, 'system');
   console.log(`  ✅ Created & published: PO Approval Matrix (${table.id})`);
 }
+
+// ============================================================================
+// Seed: Ticket Routing & SLA Decision Table
+// ============================================================================
+
+export async function seedTicketRoutingSLA(): Promise<void> {
+  const existing = await decisionTableService.getTableBySlug('ticket-routing-sla');
+  if (existing) {
+    console.log('  ✅ Ticket Routing & SLA table already exists');
+    return;
+  }
+
+  const table = await decisionTableService.createQuickTable({
+    name: 'Ticket Routing & SLA',
+    createdBy: 'system',
+    hitPolicy: 'FIRST',
+    inputs: [
+      { name: 'requestType', label: 'Request Type', type: 'string' },
+      { name: 'priority', label: 'Priority', type: 'string' },
+      { name: 'category', label: 'Category', type: 'string' },
+    ],
+    outputs: [
+      { name: 'assignTo', label: 'Assign To', type: 'string' },
+      { name: 'responseTime', label: 'Response Time', type: 'string' },
+      { name: 'resolveTime', label: 'Resolve Time', type: 'string' },
+    ],
+    rules: [
+      // Rule 1: Critical incident + security → security team, 5 min / 1 hour
+      {
+        conditions: {
+          requestType: { type: 'equals', value: 'incident' },
+          priority: { type: 'equals', value: 'critical' },
+          category: { type: 'equals', value: 'security' },
+        },
+        outputs: { assignTo: 'security', responseTime: '5 min', resolveTime: '1 hour' },
+      },
+      // Rule 2: Critical incident (any category) → senior-team, 15 min / 2 hours
+      {
+        conditions: {
+          requestType: { type: 'equals', value: 'incident' },
+          priority: { type: 'equals', value: 'critical' },
+          category: { type: 'any' },
+        },
+        outputs: { assignTo: 'senior-team', responseTime: '15 min', resolveTime: '2 hours' },
+      },
+      // Rule 3: High incident → tier-2, 30 min / 4 hours
+      {
+        conditions: {
+          requestType: { type: 'equals', value: 'incident' },
+          priority: { type: 'equals', value: 'high' },
+          category: { type: 'any' },
+        },
+        outputs: { assignTo: 'tier-2', responseTime: '30 min', resolveTime: '4 hours' },
+      },
+      // Rule 4: Medium incident → tier-1, 2 hours / 1 day
+      {
+        conditions: {
+          requestType: { type: 'equals', value: 'incident' },
+          priority: { type: 'equals', value: 'medium' },
+          category: { type: 'any' },
+        },
+        outputs: { assignTo: 'tier-1', responseTime: '2 hours', resolveTime: '1 day' },
+      },
+      // Rule 5: Low incident → tier-1, 8 hours / 3 days
+      {
+        conditions: {
+          requestType: { type: 'equals', value: 'incident' },
+          priority: { type: 'equals', value: 'low' },
+          category: { type: 'any' },
+        },
+        outputs: { assignTo: 'tier-1', responseTime: '8 hours', resolveTime: '3 days' },
+      },
+      // Rule 6: Service request + access → tier-1, 4 hours / 1 day
+      {
+        conditions: {
+          requestType: { type: 'equals', value: 'service' },
+          priority: { type: 'any' },
+          category: { type: 'equals', value: 'access' },
+        },
+        outputs: { assignTo: 'tier-1', responseTime: '4 hours', resolveTime: '1 day' },
+      },
+      // Rule 7: Service request + hardware → hardware, 4 hours / 2 days
+      {
+        conditions: {
+          requestType: { type: 'equals', value: 'service' },
+          priority: { type: 'any' },
+          category: { type: 'equals', value: 'hardware' },
+        },
+        outputs: { assignTo: 'hardware', responseTime: '4 hours', resolveTime: '2 days' },
+      },
+      // Rule 8: Question (any) → helpdesk, 8 hours / 2 days
+      {
+        conditions: {
+          requestType: { type: 'equals', value: 'question' },
+          priority: { type: 'any' },
+          category: { type: 'any' },
+        },
+        outputs: { assignTo: 'helpdesk', responseTime: '8 hours', resolveTime: '2 days' },
+      },
+      // Rule 9: Catch-all default → tier-1, 4 hours / 2 days
+      {
+        conditions: {
+          requestType: { type: 'any' },
+          priority: { type: 'any' },
+          category: { type: 'any' },
+        },
+        outputs: { assignTo: 'tier-1', responseTime: '4 hours', resolveTime: '2 days' },
+      },
+    ],
+  });
+
+  await decisionTableService.publishTable(table.id, 'system');
+  console.log(`  ✅ Created & published: Ticket Routing & SLA (${table.id})`);
+}
