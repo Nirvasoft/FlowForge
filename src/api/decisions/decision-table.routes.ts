@@ -4,6 +4,7 @@
 
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { decisionTableService } from '../../services/decisions/decision-table.service';
+import type { DecisionTable } from '../../types/decisions';
 
 interface IdParams { id: string; }
 interface InputParams extends IdParams { inputId: string; }
@@ -11,32 +12,147 @@ interface OutputParams extends IdParams { outputId: string; }
 interface RuleParams extends IdParams { ruleId: string; }
 interface TestParams extends IdParams { testId: string; }
 
+// ============================================================================
+// Backend → Frontend type transformation
+// ============================================================================
+
+const HIT_POLICY_MAP: Record<string, string> = {
+  'UNIQUE': 'unique',
+  'FIRST': 'first',
+  'PRIORITY': 'priority',
+  'ANY': 'any',
+  'COLLECT': 'collect',
+  'RULE_ORDER': 'first',
+  'OUTPUT_ORDER': 'first',
+};
+
+const CONDITION_TYPE_TO_OPERATOR: Record<string, string> = {
+  'any': 'any',
+  'equals': 'eq',
+  'notEquals': 'neq',
+  'greaterThan': 'gt',
+  'greaterThanOrEqual': 'gte',
+  'lessThan': 'lt',
+  'lessThanOrEqual': 'lte',
+  'between': 'between',
+  'in': 'in',
+  'contains': 'contains',
+  'startsWith': 'starts',
+  'endsWith': 'ends',
+  'matches': 'regex',
+  'isNull': 'empty',
+  'isNotNull': 'any',
+  'expression': 'any',
+};
+
+function toFrontendTable(table: DecisionTable): unknown {
+  return {
+    id: table.id,
+    name: table.name,
+    slug: table.slug,
+    description: table.description,
+    hitPolicy: HIT_POLICY_MAP[table.hitPolicy] || table.hitPolicy?.toLowerCase() || 'first',
+    status: table.status,
+    version: table.version,
+    inputs: table.inputs.map(inp => ({
+      id: inp.id,
+      name: inp.name,
+      label: inp.label,
+      type: inp.type,
+      required: inp.required,
+      allowedValues: inp.allowedValues,
+      defaultValue: undefined,
+    })),
+    outputs: table.outputs.map(out => ({
+      id: out.id,
+      name: out.name,
+      label: out.label,
+      type: out.type,
+      defaultValue: out.defaultValue,
+    })),
+    rules: table.rules.map((rule, idx) => {
+      // Convert inputEntries → conditions
+      const conditions: Record<string, unknown> = {};
+      if (rule.inputEntries) {
+        for (const [inputId, entry] of Object.entries(rule.inputEntries)) {
+          const cond = entry.condition;
+          const condType = cond?.type ?? 'any';
+          const operator = CONDITION_TYPE_TO_OPERATOR[condType] || 'any';
+
+          // Extract value based on condition type
+          let value: unknown;
+          if (condType === 'between') {
+            value = `${(cond as any).min}-${(cond as any).max}`;
+          } else if (condType === 'in' || condType === 'notIn') {
+            value = (cond as any).values?.join(', ');
+          } else if (condType === 'any' || condType === 'isNull' || condType === 'isNotNull') {
+            value = undefined;
+          } else {
+            value = (cond as any).value;
+          }
+
+          conditions[inputId] = { operator, value };
+        }
+      }
+
+      // Convert outputEntries → outputs
+      const outputs: Record<string, unknown> = {};
+      if (rule.outputEntries) {
+        for (const [outputId, entry] of Object.entries(rule.outputEntries)) {
+          outputs[outputId] = {
+            value: entry.value,
+            expression: entry.expression,
+          };
+        }
+      }
+
+      return {
+        id: rule.id,
+        priority: rule.priority ?? idx + 1,
+        description: rule.annotation,
+        conditions,
+        outputs,
+        enabled: rule.enabled,
+      };
+    }),
+    createdAt: table.createdAt instanceof Date ? table.createdAt.toISOString() : table.createdAt,
+    updatedAt: table.updatedAt instanceof Date ? table.updatedAt.toISOString() : table.updatedAt,
+    publishedAt: table.publishedAt
+      ? (table.publishedAt instanceof Date ? table.publishedAt.toISOString() : table.publishedAt)
+      : undefined,
+  };
+}
+
 export async function decisionTableRoutes(fastify: FastifyInstance) {
   const service = decisionTableService;
 
   // List tables
   fastify.get('/', async (request: FastifyRequest<{ Querystring: { status?: string; search?: string } }>) => {
-    return service.listTables(request.query as any);
+    const result = await service.listTables(request.query as any);
+    return {
+      tables: result.tables.map(t => toFrontendTable(t)),
+      total: result.total,
+    };
   });
 
   // Create table
   fastify.post<{ Body: { name: string; description?: string; hitPolicy?: string } }>('/', async (request, reply) => {
     const table = await service.createTable({ ...request.body as any, createdBy: 'user-1' });
-    return reply.status(201).send(table);
+    return reply.status(201).send(toFrontendTable(table));
   });
 
   // Get table
   fastify.get<{ Params: IdParams }>('/:id', async (request, reply) => {
     const table = await service.getTable(request.params.id);
     if (!table) return reply.status(404).send({ error: 'Table not found' });
-    return table;
+    return toFrontendTable(table);
   });
 
   // Update table
   fastify.patch<{ Params: IdParams; Body: any }>('/:id', async (request, reply) => {
     const table = await service.updateTable(request.params.id, request.body as any);
     if (!table) return reply.status(404).send({ error: 'Table not found' });
-    return table;
+    return toFrontendTable(table);
   });
 
   // Delete table
@@ -59,7 +175,7 @@ export async function decisionTableRoutes(fastify: FastifyInstance) {
     try {
       const table = await service.publishTable(request.params.id, 'user-1');
       if (!table) return reply.status(404).send({ error: 'Table not found' });
-      return table;
+      return toFrontendTable(table);
     } catch (error) {
       return reply.status(400).send({ error: (error as Error).message });
     }
@@ -69,7 +185,7 @@ export async function decisionTableRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: IdParams }>('/:id/unpublish', async (request, reply) => {
     const table = await service.unpublishTable(request.params.id);
     if (!table) return reply.status(404).send({ error: 'Table not found' });
-    return table;
+    return toFrontendTable(table);
   });
 
   // ============================================================================
