@@ -979,3 +979,99 @@ export async function seedTicketRoutingSLA(): Promise<void> {
   await decisionTableService.publishTable(table.id, 'system');
   console.log(`  ✅ Created & published: Ticket Routing & SLA (${table.id})`);
 }
+
+/**
+ * Seed: Onboarding Equipment & Access decision table
+ * Determines standard equipment, software bundle, and system access based on department + employment type
+ */
+export async function seedOnboardingEquipmentAccess(): Promise<void> {
+  const existing = await decisionTableService.getTableBySlug('onboarding-equipment-access');
+  if (existing) {
+    console.log('  ✅ Onboarding Equipment & Access table already exists');
+    return;
+  }
+
+  const table = await decisionTableService.createQuickTable({
+    name: 'Onboarding Equipment & Access',
+    createdBy: 'system',
+    hitPolicy: 'FIRST',
+    inputs: [
+      { name: 'department', label: 'Department', type: 'string' },
+      { name: 'employmentType', label: 'Employment Type', type: 'string' },
+    ],
+    outputs: [
+      { name: 'computer', label: 'Default Computer', type: 'string' },
+      { name: 'softwareBundle', label: 'Software Bundle', type: 'string' },
+      { name: 'defaultAccess', label: 'Default System Access', type: 'string' },
+    ],
+    rules: [
+      // Rule 1: Engineering fulltime → MacBook Pro, Dev Tools
+      {
+        conditions: {
+          department: { type: 'equals', value: 'Engineering' },
+          employmentType: { type: 'equals', value: 'fulltime' },
+        },
+        outputs: { computer: 'MacBook Pro 14"', softwareBundle: 'Office 365, Slack, GitHub, Jira, VS Code', defaultAccess: 'HR Portal, GitHub, Jira' },
+      },
+      // Rule 2: Engineering contractor → ThinkPad, limited dev tools
+      {
+        conditions: {
+          department: { type: 'equals', value: 'Engineering' },
+          employmentType: { type: 'equals', value: 'contractor' },
+        },
+        outputs: { computer: 'ThinkPad X1', softwareBundle: 'Slack, GitHub, Jira', defaultAccess: 'GitHub, Jira' },
+      },
+      // Rule 3: Marketing → MacBook Air, Creative tools
+      {
+        conditions: {
+          department: { type: 'equals', value: 'Marketing' },
+          employmentType: { type: 'any' },
+        },
+        outputs: { computer: 'MacBook Air', softwareBundle: 'Office 365, Adobe Creative Cloud, Slack, Zoom', defaultAccess: 'HR Portal, CRM' },
+      },
+      // Rule 4: Sales → Dell XPS, CRM tools
+      {
+        conditions: {
+          department: { type: 'equals', value: 'Sales' },
+          employmentType: { type: 'any' },
+        },
+        outputs: { computer: 'Dell XPS 15', softwareBundle: 'Office 365, Slack, Zoom, Salesforce', defaultAccess: 'HR Portal, CRM, ERP' },
+      },
+      // Rule 5: Finance → Dell XPS, Finance tools
+      {
+        conditions: {
+          department: { type: 'equals', value: 'Finance' },
+          employmentType: { type: 'any' },
+        },
+        outputs: { computer: 'Dell XPS 15', softwareBundle: 'Office 365, Slack, Excel Advanced', defaultAccess: 'HR Portal, Finance System, ERP' },
+      },
+      // Rule 6: HR → MacBook Air, HR tools
+      {
+        conditions: {
+          department: { type: 'equals', value: 'Human Resources' },
+          employmentType: { type: 'any' },
+        },
+        outputs: { computer: 'MacBook Air', softwareBundle: 'Office 365, Slack, Zoom, BambooHR', defaultAccess: 'HR Portal, Finance System' },
+      },
+      // Rule 7: IT → ThinkPad, IT admin tools
+      {
+        conditions: {
+          department: { type: 'equals', value: 'IT' },
+          employmentType: { type: 'any' },
+        },
+        outputs: { computer: 'ThinkPad X1', softwareBundle: 'Office 365, Slack, Jira, ServiceNow, Azure AD', defaultAccess: 'HR Portal, All Systems (Admin)' },
+      },
+      // Rule 8: Catch-all default
+      {
+        conditions: {
+          department: { type: 'any' },
+          employmentType: { type: 'any' },
+        },
+        outputs: { computer: 'Dell XPS 15', softwareBundle: 'Office 365, Slack', defaultAccess: 'HR Portal' },
+      },
+    ],
+  });
+
+  await decisionTableService.publishTable(table.id, 'system');
+  console.log(`  ✅ Created & published: Onboarding Equipment & Access (${table.id})`);
+}
