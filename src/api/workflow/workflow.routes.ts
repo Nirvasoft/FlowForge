@@ -388,7 +388,48 @@ export async function executionRoutes(fastify: FastifyInstance) {
     schema: { description: 'List all executions', tags: ['Executions'] },
   }, async (request: FastifyRequest<{ Querystring: { workflowId?: string; status?: string; page?: number; pageSize?: number } }>, reply) => {
     const result = await service.listExecutions(request.query as any);
-    return result;
+
+    // If in-memory has data, return it
+    if (result.executions && result.executions.length > 0) {
+      return result;
+    }
+
+    // Fallback: query Prisma ProcessInstance table
+    const query = request.query;
+    const page = Number(query.page) || 1;
+    const pageSize = Number(query.pageSize) || 20;
+    const where: any = {};
+    if (query.workflowId) where.processId = query.workflowId;
+    if (query.status) where.status = query.status;
+
+    const [instances, total] = await Promise.all([
+      prisma.processInstance.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: { startedAt: 'desc' },
+        include: { process: { select: { name: true } } },
+      }),
+      prisma.processInstance.count({ where }),
+    ]);
+
+    return {
+      executions: instances.map(inst => ({
+        id: inst.id,
+        workflowId: inst.processId,
+        workflowName: (inst as any).process?.name,
+        status: inst.status,
+        currentNodes: inst.currentNodes,
+        variables: inst.variables,
+        startedBy: inst.startedBy,
+        startedAt: inst.startedAt,
+        completedAt: inst.completedAt,
+        dueAt: inst.dueAt,
+      })),
+      total,
+      page,
+      pageSize,
+    };
   });
 
   // Get execution
@@ -460,7 +501,60 @@ export async function taskRoutes(fastify: FastifyInstance) {
     schema: { description: 'List tasks', tags: ['Tasks'] },
   }, async (request: FastifyRequest<{ Querystring: { assigneeId?: string; status?: string; workflowId?: string; page?: number; pageSize?: number } }>, reply) => {
     const result = await service.listTasks(request.query as any);
-    return result;
+
+    // If in-memory has data, return it
+    if (result.tasks && result.tasks.length > 0) {
+      return result;
+    }
+
+    // Fallback: query Prisma TaskInstance table
+    const query = request.query;
+    const page = Number(query.page) || 1;
+    const pageSize = Number(query.pageSize) || 20;
+    const where: any = {};
+    if (query.assigneeId) where.assigneeId = query.assigneeId;
+    if (query.status) where.status = query.status;
+
+    const [tasks, total] = await Promise.all([
+      prisma.taskInstance.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          instance: {
+            select: { process: { select: { name: true } } },
+          },
+        },
+      }),
+      prisma.taskInstance.count({ where }),
+    ]);
+
+    return {
+      tasks: tasks.map(task => ({
+        id: task.id,
+        instanceId: task.instanceId,
+        nodeId: task.nodeId,
+        name: task.name,
+        description: task.description,
+        taskType: task.taskType,
+        assigneeId: task.assigneeId,
+        assigneeType: task.assigneeType,
+        formData: task.formData,
+        status: task.status,
+        priority: task.priority,
+        outcome: task.outcome,
+        comments: task.comments,
+        dueAt: task.dueAt,
+        completedAt: task.completedAt,
+        completedBy: task.completedBy,
+        createdAt: task.createdAt,
+        workflowName: (task as any).instance?.process?.name,
+      })),
+      total,
+      page,
+      pageSize,
+    };
   });
 
   // Get my tasks

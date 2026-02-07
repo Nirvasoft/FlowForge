@@ -27,7 +27,7 @@ import {
     ModalFooter
 } from '../../components/ui';
 import { cn } from '../../lib/utils';
-import { listProcesses, listTasks, createProcess, updateProcess, deleteProcess } from '../../api/workflows';
+import { listProcesses, listTasks, listAllInstances, createProcess, updateProcess, deleteProcess } from '../../api/workflows';
 import type { Process, ProcessInstance, Task } from '../../types';
 
 const processStatusVariants: Record<Process['status'], 'success' | 'warning' | 'info' | 'error'> = {
@@ -51,7 +51,7 @@ export function WorkflowsPage() {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<TabType>('processes');
     const [processes, setProcesses] = useState<Process[]>([]);
-    const [instances] = useState<ProcessInstance[]>([]); // TODO: Add listInstances API when available
+    const [instances, setInstances] = useState<ProcessInstance[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -91,15 +91,33 @@ export function WorkflowsPage() {
         }
     }, [statusFilter]);
 
+    // Load instances from API
+    const loadInstances = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            const response = await listAllInstances({
+                status: statusFilter !== 'all' ? statusFilter : undefined,
+            });
+            setInstances(response);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to load instances');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [statusFilter]);
+
     useEffect(() => {
         if (activeTab === 'processes') {
             loadProcesses();
         } else if (activeTab === 'tasks') {
             loadTasks();
+        } else if (activeTab === 'instances') {
+            loadInstances();
         } else {
             setIsLoading(false);
         }
-    }, [activeTab, loadProcesses, loadTasks]);
+    }, [activeTab, loadProcesses, loadTasks, loadInstances]);
 
     // Close dropdown
     useEffect(() => {

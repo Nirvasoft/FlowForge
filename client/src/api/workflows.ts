@@ -100,6 +100,19 @@ export async function listProcessInstances(processId: string): Promise<ProcessIn
 }
 
 /**
+ * List all process instances across all workflows
+ */
+export async function listAllInstances(params: { status?: string } = {}): Promise<ProcessInstance[]> {
+    const searchParams = new URLSearchParams();
+    if (params.status) searchParams.set('status', params.status);
+
+    const response = await apiClient.get(`/executions?${searchParams.toString()}`);
+    const body = response.data;
+    // Backend returns { executions: [...], total, page, pageSize }
+    return body.executions || body.data || [];
+}
+
+/**
  * Get a process instance
  */
 export async function getProcessInstance(instanceId: string): Promise<ProcessInstance> {
