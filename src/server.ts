@@ -23,6 +23,7 @@ import { formRoutes } from './api/forms/index.js';
 import { appRoutes, componentRoutes } from './api/apps/index.js';
 import { dashboardRoutes, reportRoutes, processAnalyticsRoutes, queryRoutes } from './api/analytics/index.js';
 import { decisionTableRoutes } from './api/decisions/decision-table.routes.js';
+import { seedExpenseApprovalTable } from './services/decisions/decision-table.service.js';
 /**
  * Build and configure Fastify server
  */
@@ -180,6 +181,15 @@ async function start() {
       },
       '🚀 FlowForge server started'
     );
+
+    // Seed in-memory data (decision tables)
+    try {
+      console.log('\n📊 Seeding in-memory decision tables...');
+      await seedExpenseApprovalTable();
+      console.log('✅ In-memory seeding complete\n');
+    } catch (err) {
+      logger.warn({ err }, 'Failed to seed decision tables (non-fatal)');
+    }
   } catch (error) {
     logger.error({ error }, 'Failed to start server');
     process.exit(1);

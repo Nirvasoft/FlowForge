@@ -485,7 +485,7 @@ export class DecisionTableService {
     options: { limit?: number; offset?: number } = {}
   ): Promise<{ logs: EvaluationLog[]; total: number }> {
     const logs = evaluationLogs.get(tableId) || [];
-    const sorted = [...logs].sort((a, b) => 
+    const sorted = [...logs].sort((a, b) =>
       b.evaluatedAt.getTime() - a.evaluatedAt.getTime()
     );
 
@@ -664,3 +664,109 @@ export class DecisionTableService {
 }
 
 export const decisionTableService = new DecisionTableService();
+
+// ============================================================================
+// Seed: Expense Approval Routing Decision Table
+// ============================================================================
+
+export async function seedExpenseApprovalTable(): Promise<void> {
+  // Check if already seeded
+  const existing = await decisionTableService.getTableBySlug('expense-approval-routing');
+  if (existing) {
+    console.log('  ✅ Expense Approval Routing table already exists');
+    return;
+  }
+
+  const table = await decisionTableService.createQuickTable({
+    name: 'Expense Approval Routing',
+    createdBy: 'system',
+    hitPolicy: 'FIRST',
+    inputs: [
+      { name: 'category', label: 'Category', type: 'string' },
+      { name: 'amount', label: 'Amount', type: 'number' },
+    ],
+    outputs: [
+      { name: 'approver', label: 'Approver', type: 'string' },
+      { name: 'financeReview', label: 'Finance Review?', type: 'boolean' },
+    ],
+    rules: [
+      // Rule 1: Any category, ≤ $100 → Auto-approve
+      {
+        conditions: {
+          category: { type: 'any' },
+          amount: { type: 'lessThanOrEqual', value: 100 },
+        },
+        outputs: { approver: 'auto', financeReview: false },
+      },
+      // Rule 2: Meals, ≤ $250 → Manager, no finance
+      {
+        conditions: {
+          category: { type: 'equals', value: 'meals' },
+          amount: { type: 'lessThanOrEqual', value: 250 },
+        },
+        outputs: { approver: 'manager', financeReview: false },
+      },
+      // Rule 3: Meals, > $250 → Manager + finance
+      {
+        conditions: {
+          category: { type: 'equals', value: 'meals' },
+          amount: { type: 'greaterThan', value: 250 },
+        },
+        outputs: { approver: 'manager', financeReview: true },
+      },
+      // Rule 4: Travel, ≤ $1,000 → Manager, no finance
+      {
+        conditions: {
+          category: { type: 'equals', value: 'travel' },
+          amount: { type: 'lessThanOrEqual', value: 1000 },
+        },
+        outputs: { approver: 'manager', financeReview: false },
+      },
+      // Rule 5: Travel, $1,001–$5,000 → Director + finance
+      {
+        conditions: {
+          category: { type: 'equals', value: 'travel' },
+          amount: { type: 'between', min: 1001, max: 5000 },
+        },
+        outputs: { approver: 'director', financeReview: true },
+      },
+      // Rule 6: Travel, > $5,000 → VP + finance
+      {
+        conditions: {
+          category: { type: 'equals', value: 'travel' },
+          amount: { type: 'greaterThan', value: 5000 },
+        },
+        outputs: { approver: 'vp', financeReview: true },
+      },
+      // Rule 7: Software, ≤ $500 → Manager, no finance
+      {
+        conditions: {
+          category: { type: 'equals', value: 'software' },
+          amount: { type: 'lessThanOrEqual', value: 500 },
+        },
+        outputs: { approver: 'manager', financeReview: false },
+      },
+      // Rule 8: Software, > $500 → IT Director + finance
+      {
+        conditions: {
+          category: { type: 'equals', value: 'software' },
+          amount: { type: 'greaterThan', value: 500 },
+        },
+        outputs: { approver: 'it_director', financeReview: true },
+      },
+      // Rule 9: Default → Manager, no finance
+      {
+        conditions: {
+          category: { type: 'any' },
+          amount: { type: 'any' },
+        },
+        outputs: { approver: 'manager', financeReview: false },
+      },
+    ],
+  });
+
+  // Publish the table so it's ready for evaluation
+  await decisionTableService.publishTable(table.id, 'system');
+
+  console.log(`  ✅ Created & published: Expense Approval Routing (${table.id})`);
+}
