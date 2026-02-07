@@ -770,3 +770,98 @@ export async function seedExpenseApprovalTable(): Promise<void> {
 
   console.log(`  ✅ Created & published: Expense Approval Routing (${table.id})`);
 }
+
+// ============================================================================
+// Seed: PO Approval Matrix Decision Table
+// ============================================================================
+
+export async function seedPOApprovalMatrix(): Promise<void> {
+  const existing = await decisionTableService.getTableBySlug('po-approval-matrix');
+  if (existing) {
+    console.log('  ✅ PO Approval Matrix table already exists');
+    return;
+  }
+
+  const table = await decisionTableService.createQuickTable({
+    name: 'PO Approval Matrix',
+    createdBy: 'system',
+    hitPolicy: 'COLLECT',
+    inputs: [
+      { name: 'department', label: 'Department', type: 'string' },
+      { name: 'amount', label: 'Amount', type: 'number' },
+      { name: 'urgency', label: 'Urgency', type: 'string' },
+    ],
+    outputs: [
+      { name: 'approver1', label: 'Approver 1', type: 'string' },
+      { name: 'approver2', label: 'Approver 2', type: 'string' },
+    ],
+    rules: [
+      // Rule 1: Any dept, ≤ $500, any urgency → manager only
+      {
+        conditions: {
+          department: { type: 'any' },
+          amount: { type: 'lessThanOrEqual', value: 500 },
+          urgency: { type: 'any' },
+        },
+        outputs: { approver1: 'manager', approver2: null },
+      },
+      // Rule 2: Any dept, $501-$5,000, normal → manager only
+      {
+        conditions: {
+          department: { type: 'any' },
+          amount: { type: 'between', min: 501, max: 5000 },
+          urgency: { type: 'equals', value: 'normal' },
+        },
+        outputs: { approver1: 'manager', approver2: null },
+      },
+      // Rule 3: Any dept, $501-$5,000, urgent → manager + finance
+      {
+        conditions: {
+          department: { type: 'any' },
+          amount: { type: 'between', min: 501, max: 5000 },
+          urgency: { type: 'equals', value: 'urgent' },
+        },
+        outputs: { approver1: 'manager', approver2: 'finance' },
+      },
+      // Rule 4: Any dept, $5,001-$25,000 → director + finance
+      {
+        conditions: {
+          department: { type: 'any' },
+          amount: { type: 'between', min: 5001, max: 25000 },
+          urgency: { type: 'any' },
+        },
+        outputs: { approver1: 'director', approver2: 'finance' },
+      },
+      // Rule 5: Any dept, $25,001-$100,000 → vp + cfo
+      {
+        conditions: {
+          department: { type: 'any' },
+          amount: { type: 'between', min: 25001, max: 100000 },
+          urgency: { type: 'any' },
+        },
+        outputs: { approver1: 'vp', approver2: 'cfo' },
+      },
+      // Rule 6: Any dept, > $100,000 → ceo + board
+      {
+        conditions: {
+          department: { type: 'any' },
+          amount: { type: 'greaterThan', value: 100000 },
+          urgency: { type: 'any' },
+        },
+        outputs: { approver1: 'ceo', approver2: 'board' },
+      },
+      // Rule 7: Engineering, > $10,000 → cto + finance (override)
+      {
+        conditions: {
+          department: { type: 'equals', value: 'engineering' },
+          amount: { type: 'greaterThan', value: 10000 },
+          urgency: { type: 'any' },
+        },
+        outputs: { approver1: 'cto', approver2: 'finance' },
+      },
+    ],
+  });
+
+  await decisionTableService.publishTable(table.id, 'system');
+  console.log(`  ✅ Created & published: PO Approval Matrix (${table.id})`);
+}
