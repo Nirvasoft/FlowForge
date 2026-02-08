@@ -1,0 +1,39 @@
+# ============================================================================
+# Render Infrastructure-as-Code Blueprint
+# Deploy with: Connect repo → Render auto-detects render.yaml
+# ============================================================================
+
+databases:
+  - name: flowforge-db
+    plan: free        # Change to 'starter' ($7/mo) for persistent data
+    databaseName: flowforge
+    user: flowforge
+    ipAllowList: []   # Allow only Render internal traffic
+
+services:
+  - type: web
+    name: flowforge
+    runtime: docker
+    plan: free         # Change to 'starter' ($7/mo) for always-on
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    repo: https://github.com/Nirvasoft/FlowForge.git
+    branch: main
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: flowforge-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        value: https://flowforge.onrender.com
+      - key: LOG_LEVEL
+        value: info
+      - key: PORT
+        value: "3000"
+      - key: HOST
+        value: "0.0.0.0"

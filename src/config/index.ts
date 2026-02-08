@@ -14,7 +14,7 @@ const envSchema = z.object({
   API_PREFIX: z.string().default('/api/v1'),
 
   // Database
-  DATABASE_URL: z.string().url(),
+  DATABASE_URL: z.string().min(1),
 
   // Redis
   REDIS_URL: z.string().url().optional(),
@@ -43,7 +43,7 @@ const envSchema = z.object({
   SMTP_FROM: z.string().email().optional(),
 
   // Frontend
-  FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+  FRONTEND_URL: z.string().default('http://localhost:5173'),
 
   // Security
   ENCRYPTION_KEY: z.string().min(32).optional(),

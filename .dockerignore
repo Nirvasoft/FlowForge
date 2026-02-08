@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+client/node_modules/
+
+# Build output (rebuilt in Docker)
+dist/
+client/dist/
+build/
+
+# Git
+.git/
+.gitignore
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Docs / Tests (not needed in image)
+docs/
+tests/
+coverage/
+*.md
+
+# Docker
+docker/
+docker-compose.yml
+
+# AI assistant
+.gemini/
+.agent/
+
+# Temporary
+tmp/
+temp/
+*.log

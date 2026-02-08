@@ -5,6 +5,8 @@ import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import fastifyStatic from '@fastify/static';
+import path from 'path';
 
 import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
@@ -118,7 +120,6 @@ async function buildServer() {
 
   // Error handlers
   fastify.setErrorHandler(errorHandler);
-  fastify.setNotFoundHandler(notFoundHandler);
 
   // Register routes
   await fastify.register(healthRoutes, { prefix: '/health' });
@@ -139,6 +140,31 @@ async function buildServer() {
   await fastify.register(processAnalyticsRoutes, { prefix: '/api/v1/analytics' });
   await fastify.register(queryRoutes, { prefix: '/api/v1/query' });
   await fastify.register(decisionTableRoutes, { prefix: '/api/v1/decision-tables' });
+
+  // ---------- Serve React client in production ----------
+  if (config.isProduction) {
+    const clientDir = path.join(process.cwd(), 'client', 'dist');
+
+    await fastify.register(fastifyStatic, {
+      root: clientDir,
+      prefix: '/',
+      decorateReply: false,
+    });
+
+    // SPA fallback: serve index.html for any route not handled by API / health / docs
+    fastify.setNotFoundHandler(async (request, reply) => {
+      const url = request.url;
+      // Let API, health, docs, and swagger return 404 normally
+      if (url.startsWith('/api/') || url.startsWith('/health') || url.startsWith('/docs') || url.startsWith('/scim/')) {
+        return reply.status(404).send({ error: 'Not Found' });
+      }
+      // Everything else → index.html (React Router handles it)
+      return reply.sendFile('index.html');
+    });
+  } else {
+    fastify.setNotFoundHandler(notFoundHandler);
+  }
+
   return fastify;
 }
 
