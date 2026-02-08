@@ -1,0 +1,53 @@
+# ============================================================================
+# DigitalOcean App Platform Specification
+# Deploy: DO Control Panel → Apps → Create App → Import from GitHub
+# Or: doctl apps create --spec .do/app.yaml
+# ============================================================================
+
+name: flowforge
+region: sgp           # Singapore (closest to Myanmar). Alternatives: sfo, nyc, ams, fra
+
+databases:
+  - name: flowforge-db
+    engine: PG
+    version: "16"
+    production: false   # Set to true + add cluster_name for managed DB ($15/mo+)
+
+services:
+  - name: flowforge
+    dockerfile_path: Dockerfile
+    source_dir: /
+    github:
+      repo: Nirvasoft/FlowForge
+      branch: main
+      deploy_on_push: true
+
+    instance_count: 1
+    instance_size_slug: basic-xxs    # $5/mo (512 MB RAM, 1 vCPU)
+
+    http_port: 3000
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 15
+      period_seconds: 30
+      timeout_seconds: 5
+
+    envs:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        scope: RUN_AND_BUILD_TIME
+        value: ${flowforge-db.DATABASE_URL}
+      - key: JWT_SECRET
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+        value: CHANGE_ME_TO_A_64_CHAR_RANDOM_STRING
+      - key: FRONTEND_URL
+        scope: RUN_AND_BUILD_TIME
+        value: ${APP_URL}
+      - key: LOG_LEVEL
+        value: info
+      - key: PORT
+        value: "3000"
+      - key: HOST
+        value: "0.0.0.0"
