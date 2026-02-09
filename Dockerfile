@@ -75,9 +75,9 @@ COPY --from=backend-builder /app/dist ./dist
 # Copy built client from stage 2
 COPY --from=client-builder /app/client/dist ./client/dist
 
-# Copy startup script
+# Copy startup script and ensure LF line endings
 COPY scripts/start.sh ./scripts/start.sh
-RUN chmod +x ./scripts/start.sh
+RUN sed -i 's/\r$//' ./scripts/start.sh && chmod +x ./scripts/start.sh
 
 # Set ownership
 RUN chown -R flowforge:nodejs /app
