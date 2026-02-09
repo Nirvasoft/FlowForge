@@ -142,14 +142,13 @@ async function buildServer() {
   await fastify.register(queryRoutes, { prefix: '/api/v1/query' });
   await fastify.register(decisionTableRoutes, { prefix: '/api/v1/decision-tables' });
 
-  // ---------- Serve React client in production ----------
+  // ---------- Serve React client when built files exist ----------
   const clientDir = path.join(process.cwd(), 'client', 'dist');
-  const isProduction = config.isProduction;
   const clientExists = fs.existsSync(clientDir);
 
-  console.log(`📁 SPA serving check: NODE_ENV=${config.env}, isProduction=${isProduction}, clientDir=${clientDir}, exists=${clientExists}`);
+  console.log(`📁 SPA serving: clientDir=${clientDir}, exists=${clientExists}, NODE_ENV=${config.env}`);
 
-  if (isProduction && clientExists) {
+  if (clientExists) {
     await fastify.register(fastifyStatic, {
       root: clientDir,
       prefix: '/',
@@ -167,9 +166,6 @@ async function buildServer() {
       return reply.sendFile('index.html');
     });
   } else {
-    if (isProduction && !clientExists) {
-      console.warn(`⚠️  Production mode but client/dist not found at: ${clientDir}`);
-    }
     fastify.setNotFoundHandler(notFoundHandler);
   }
 
