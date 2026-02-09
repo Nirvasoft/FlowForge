@@ -75,6 +75,10 @@ COPY --from=backend-builder /app/dist ./dist
 # Copy built client from stage 2
 COPY --from=client-builder /app/client/dist ./client/dist
 
+# Copy startup script
+COPY scripts/start.sh ./scripts/start.sh
+RUN chmod +x ./scripts/start.sh
+
 # Set ownership
 RUN chown -R flowforge:nodejs /app
 
@@ -84,9 +88,9 @@ USER flowforge
 # Expose port
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+# Health check (longer start period for migrations)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
-# Run migrations and start the server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+# Start: run migrations (non-blocking) then server
+CMD ["sh", "scripts/start.sh"]
