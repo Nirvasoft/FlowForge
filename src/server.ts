@@ -7,6 +7,7 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import fastifyStatic from '@fastify/static';
 import path from 'path';
+import fs from 'fs';
 
 import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
@@ -142,9 +143,13 @@ async function buildServer() {
   await fastify.register(decisionTableRoutes, { prefix: '/api/v1/decision-tables' });
 
   // ---------- Serve React client in production ----------
-  if (config.isProduction) {
-    const clientDir = path.join(process.cwd(), 'client', 'dist');
+  const clientDir = path.join(process.cwd(), 'client', 'dist');
+  const isProduction = config.isProduction;
+  const clientExists = fs.existsSync(clientDir);
 
+  console.log(`📁 SPA serving check: NODE_ENV=${config.env}, isProduction=${isProduction}, clientDir=${clientDir}, exists=${clientExists}`);
+
+  if (isProduction && clientExists) {
     await fastify.register(fastifyStatic, {
       root: clientDir,
       prefix: '/',
@@ -162,6 +167,9 @@ async function buildServer() {
       return reply.sendFile('index.html');
     });
   } else {
+    if (isProduction && !clientExists) {
+      console.warn(`⚠️  Production mode but client/dist not found at: ${clientDir}`);
+    }
     fastify.setNotFoundHandler(notFoundHandler);
   }
 
