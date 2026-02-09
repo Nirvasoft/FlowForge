@@ -28,26 +28,29 @@ services:
     http_port: 3000
     health_check:
       http_path: /health
-      initial_delay_seconds: 15
+      initial_delay_seconds: 60
       period_seconds: 30
       timeout_seconds: 5
 
     envs:
       - key: NODE_ENV
         value: production
+        scope: RUN_AND_BUILD_TIME
       - key: DATABASE_URL
         scope: RUN_AND_BUILD_TIME
         value: ${flowforge-db.DATABASE_URL}
       - key: JWT_SECRET
         scope: RUN_AND_BUILD_TIME
-        type: SECRET
-        value: CHANGE_ME_TO_A_64_CHAR_RANDOM_STRING
+        value: FlowForge2026SecureJWTKeyForProductionDeploymentOnDigitalOcean64
       - key: FRONTEND_URL
         scope: RUN_AND_BUILD_TIME
         value: ${APP_URL}
       - key: LOG_LEVEL
         value: info
+        scope: RUN_AND_BUILD_TIME
       - key: PORT
         value: "3000"
+        scope: RUN_AND_BUILD_TIME
       - key: HOST
         value: "0.0.0.0"
+        scope: RUN_AND_BUILD_TIME
