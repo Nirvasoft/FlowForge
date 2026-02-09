@@ -15,7 +15,6 @@ import {
     Layout,
     Loader2,
     Upload,
-    Download,
 } from 'lucide-react';
 import { Button, Input, Card, Badge, Modal } from '../../components/ui';
 import { cn } from '../../lib/utils';

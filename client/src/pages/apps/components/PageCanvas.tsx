@@ -191,11 +191,11 @@ function ComponentPreview({ component }: ComponentPreviewProps) {
         case 'text-input':
             return (
                 <div>
-                    {props.label && (
+                    {props.label ? (
                         <label className="block text-sm text-surface-400 mb-1">
                             {String(props.label)}
                         </label>
-                    )}
+                    ) : null}
                     <input
                         type="text"
                         placeholder={(props.placeholder as string) || ''}
@@ -208,9 +208,9 @@ function ComponentPreview({ component }: ComponentPreviewProps) {
         case 'card':
             return (
                 <div className="bg-surface-800 border border-surface-700 rounded-lg p-4">
-                    {props.title && (
+                    {props.title ? (
                         <h4 className="text-surface-200 font-medium mb-2">{String(props.title)}</h4>
-                    )}
+                    ) : null}
                     <p className="text-surface-500 text-sm">Card content</p>
                 </div>
             );
@@ -277,7 +277,7 @@ function ComponentPreview({ component }: ComponentPreviewProps) {
                     'px-4 py-3 rounded-lg border',
                     alertColors[(props.variant as string) || 'info']
                 )}>
-                    {props.title && <p className="font-medium">{String(props.title)}</p>}
+                    {props.title ? <p className="font-medium">{String(props.title)}</p> : null}
                     <p className="text-sm opacity-80">{String(props.message || 'Alert message')}</p>
                 </div>
             );

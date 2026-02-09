@@ -6,6 +6,8 @@
 # ---------- Stage 1: Build Backend ----------
 FROM node:20-alpine AS backend-builder
 
+RUN apk add --no-cache openssl
+
 WORKDIR /app
 
 # Copy root package files + prisma schema
@@ -49,6 +51,9 @@ RUN npm run build
 FROM node:20-alpine AS production
 
 WORKDIR /app
+
+# Install openssl for Prisma
+RUN apk add --no-cache openssl
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
