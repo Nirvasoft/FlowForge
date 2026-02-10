@@ -35,6 +35,9 @@ tsx prisma/seed-expense-claim.ts 2>&1 || echo "  ⚠️  Expense Claim seed skip
 echo "  → IT Support Ticket flow..."
 tsx prisma/seed-it-support.ts 2>&1 || echo "  ⚠️  IT Support seed skipped or failed"
 
+echo "  → Contract Lifecycle Management..."
+tsx prisma/seed-contract-lifecycle.ts 2>&1 || echo "  ⚠️  Contract Lifecycle seed skipped or failed"
+
 echo "✅ All seeds complete"
 
 echo "🚀 Starting FlowForge server..."
