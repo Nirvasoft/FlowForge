@@ -65,6 +65,13 @@ function validateEnv() {
   if (!parsed.success) {
     console.error('❌ Invalid environment variables:');
     console.error(parsed.error.flatten().fieldErrors);
+    console.error('📋 Current env:', {
+      NODE_ENV: process.env.NODE_ENV,
+      PORT: process.env.PORT,
+      HOST: process.env.HOST,
+      DATABASE_URL: process.env.DATABASE_URL ? '[SET]' : '[NOT SET]',
+      JWT_SECRET: process.env.JWT_SECRET ? `[SET, len=${process.env.JWT_SECRET.length}]` : '[NOT SET]',
+    });
     process.exit(1);
   }
 

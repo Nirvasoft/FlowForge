@@ -91,6 +91,15 @@ RUN chown -R flowforge:nodejs /app
 # Switch to non-root user
 USER flowforge
 
+# Environment defaults (overridden by platform-injected env vars at runtime)
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOST=0.0.0.0
+ENV LOG_LEVEL=info
+ENV JWT_SECRET=FlowForge2026SecureJWTKeyForProductionDeploymentOnDigitalOcean64
+ENV JWT_ACCESS_EXPIRY=15m
+ENV JWT_REFRESH_EXPIRY=7d
+
 # Expose port
 EXPOSE 3000
 
