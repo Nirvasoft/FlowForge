@@ -69,6 +69,9 @@ COPY prisma ./prisma/
 # Install production dependencies only
 RUN npm ci --only=production
 
+# Install tsx globally for running seed scripts
+RUN npm install -g tsx
+
 # Generate Prisma client (needed at runtime)
 RUN npx prisma generate
 

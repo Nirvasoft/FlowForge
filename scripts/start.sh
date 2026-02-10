@@ -1,6 +1,6 @@
 #!/bin/sh
 # FlowForge production startup script
-# Runs database setup (non-blocking) then starts the server
+# Runs database setup + seed (non-blocking) then starts the server
 
 echo "🔄 Running database setup..."
 
@@ -12,6 +12,12 @@ npx prisma db push --accept-data-loss 2>&1 || {
     echo "⚠️  Database migration failed (non-fatal). App will start anyway."
     echo "   You may need to run migrations manually."
   }
+}
+
+# Run seed if tables were created successfully
+echo "🌱 Running database seed..."
+tsx prisma/seed.ts 2>&1 || {
+  echo "⚠️  Main seed failed or already seeded (non-fatal)."
 }
 
 echo "🚀 Starting FlowForge server..."
