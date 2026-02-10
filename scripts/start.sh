@@ -38,6 +38,9 @@ tsx prisma/seed-it-support.ts 2>&1 || echo "  ⚠️  IT Support seed skipped or
 echo "  → Contract Lifecycle Management..."
 tsx prisma/seed-contract-lifecycle.ts 2>&1 || echo "  ⚠️  Contract Lifecycle seed skipped or failed"
 
+echo "  → Multi-Level Procurement System..."
+tsx prisma/seed-procurement.ts 2>&1 || echo "  ⚠️  Procurement seed skipped or failed"
+
 echo "✅ All seeds complete"
 
 echo "🚀 Starting FlowForge server..."
