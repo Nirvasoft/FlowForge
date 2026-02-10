@@ -31,6 +31,42 @@ export async function healthRoutes(fastify: FastifyInstance): Promise<void> {
   });
 
   /**
+   * Debug endpoint - inspect container state
+   * GET /health/debug
+   */
+  fastify.get('/debug', async (request: FastifyRequest, reply: FastifyReply) => {
+    const path = await import('path');
+    const fs = await import('fs');
+    const cwd = process.cwd();
+    const clientDir = path.default.join(cwd, 'client', 'dist');
+    const clientDirAlt = path.default.join(cwd, 'client');
+
+    let rootFiles: string[] = [];
+    let clientFiles: string[] = [];
+    let clientDistFiles: string[] = [];
+    try { rootFiles = fs.default.readdirSync(cwd); } catch (e: any) { rootFiles = [`ERROR: ${e.message}`]; }
+    try { clientFiles = fs.default.readdirSync(clientDirAlt); } catch (e: any) { clientFiles = [`ERROR: ${e.message}`]; }
+    try { clientDistFiles = fs.default.readdirSync(clientDir); } catch (e: any) { clientDistFiles = [`ERROR: ${e.message}`]; }
+
+    reply.send({
+      cwd,
+      nodeEnv: process.env.NODE_ENV,
+      clientDir,
+      clientDirExists: fs.default.existsSync(clientDir),
+      rootFiles,
+      clientFiles,
+      clientDistFiles,
+      env: {
+        NODE_ENV: process.env.NODE_ENV,
+        PORT: process.env.PORT,
+        HOST: process.env.HOST,
+        DATABASE_URL: process.env.DATABASE_URL ? '[SET]' : '[NOT SET]',
+        JWT_SECRET: process.env.JWT_SECRET ? `[SET, length=${process.env.JWT_SECRET.length}]` : '[NOT SET]',
+      },
+    });
+  });
+
+  /**
    * Detailed health check with dependencies
    * GET /health/ready
    */
