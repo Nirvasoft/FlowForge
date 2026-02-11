@@ -4,7 +4,6 @@
  */
 
 import apiClient from './client';
-import { get, post, patch, del } from './client';
 import type { Application, AppPage, PageComponent, ComponentDefinition, AppType, AppStatus } from '../types';
 
 // ============================================================================
@@ -82,19 +81,22 @@ interface CreatePageData {
 }
 
 export async function addPage(appId: string, data: CreatePageData): Promise<AppPage> {
-    return post<AppPage>(`/apps/${appId}/pages`, data);
+    const response = await apiClient.post(`/apps/${appId}/pages`, data);
+    return response.data;
 }
 
 export async function getPage(appId: string, pageId: string): Promise<AppPage> {
-    return get<AppPage>(`/apps/${appId}/pages/${pageId}`);
+    const response = await apiClient.get(`/apps/${appId}/pages/${pageId}`);
+    return response.data;
 }
 
 export async function updatePage(appId: string, pageId: string, data: Partial<AppPage>): Promise<AppPage> {
-    return patch<AppPage>(`/apps/${appId}/pages/${pageId}`, data);
+    const response = await apiClient.patch(`/apps/${appId}/pages/${pageId}`, data);
+    return response.data;
 }
 
 export async function deletePage(appId: string, pageId: string): Promise<void> {
-    await del(`/apps/${appId}/pages/${pageId}`);
+    await apiClient.delete(`/apps/${appId}/pages/${pageId}`);
 }
 
 // ============================================================================
@@ -109,7 +111,8 @@ interface AddComponentData {
 }
 
 export async function addComponent(appId: string, pageId: string, data: AddComponentData): Promise<PageComponent> {
-    return post<PageComponent>(`/apps/${appId}/pages/${pageId}/components`, data);
+    const response = await apiClient.post(`/apps/${appId}/pages/${pageId}/components`, data);
+    return response.data;
 }
 
 export async function updateComponent(
@@ -118,11 +121,12 @@ export async function updateComponent(
     componentId: string,
     data: Partial<PageComponent>
 ): Promise<PageComponent> {
-    return patch<PageComponent>(`/apps/${appId}/pages/${pageId}/components/${componentId}`, data);
+    const response = await apiClient.patch(`/apps/${appId}/pages/${pageId}/components/${componentId}`, data);
+    return response.data;
 }
 
 export async function deleteComponent(appId: string, pageId: string, componentId: string): Promise<void> {
-    await del(`/apps/${appId}/pages/${pageId}/components/${componentId}`);
+    await apiClient.delete(`/apps/${appId}/pages/${pageId}/components/${componentId}`);
 }
 
 export async function moveComponent(
@@ -131,32 +135,25 @@ export async function moveComponent(
     componentId: string,
     position: { row: number; column: number; width?: number }
 ): Promise<PageComponent> {
-    return patch<PageComponent>(`/apps/${appId}/pages/${pageId}/components/${componentId}/position`, position);
+    const response = await apiClient.patch(`/apps/${appId}/pages/${pageId}/components/${componentId}/position`, position);
+    return response.data;
 }
 
 // ============================================================================
 // Component Registry
 // ============================================================================
 
-interface ComponentsResponse {
-    components: ComponentDefinition[];
-}
-
-interface CategoriesResponse {
-    categories: string[];
-}
-
 export async function getComponents(): Promise<ComponentDefinition[]> {
-    const response = await get<ComponentsResponse>('/components');
-    return response.components;
+    const response = await apiClient.get('/components');
+    return response.data.components;
 }
 
 export async function getComponentCategories(): Promise<string[]> {
-    const response = await get<CategoriesResponse>('/components/categories');
-    return response.categories;
+    const response = await apiClient.get('/components/categories');
+    return response.data.categories;
 }
 
 export async function getComponentsByCategory(category: string): Promise<ComponentDefinition[]> {
-    const response = await get<ComponentsResponse>(`/components/category/${category}`);
-    return response.components;
+    const response = await apiClient.get(`/components/category/${category}`);
+    return response.data.components;
 }

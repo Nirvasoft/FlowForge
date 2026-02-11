@@ -1,34 +1,30 @@
 /**
  * FlowForge App Builder Service
- * CRUD operations for apps, pages, and components
+ * Prisma-backed CRUD for apps, pages, and components
  */
 
 import { randomUUID } from 'crypto';
-import type {
-  Application,
-  AppPage,
-  PageComponent,
-  NavigationConfig,
-  ThemeConfig,
-  DataSourceConfig,
-  AppSettings,
-  PageSettings,
-  Portal,
-  PortalSettings,
-} from '../../types/apps';
+import { prisma } from '../../utils/prisma.js';
 import { componentRegistry } from './component-registry';
 
 // ============================================================================
-// In-Memory Storage
+// Types for the definition JSON structure
 // ============================================================================
 
-const apps = new Map<string, Application>();
+interface AppDefinition {
+  type?: string;
+  theme?: any;
+  navigation?: any[];
+  pages?: any[];
+  dataSources?: any[];
+  [key: string]: any;
+}
 
 // ============================================================================
 // Default Configurations
 // ============================================================================
 
-const DEFAULT_THEME: ThemeConfig = {
+const DEFAULT_THEME = {
   name: 'Default',
   mode: 'light',
   colors: {
@@ -58,33 +54,11 @@ const DEFAULT_THEME: ThemeConfig = {
     fontWeightBold: 700,
     lineHeight: 1.5,
   },
-  spacing: {
-    unit: 4,
-    xs: '4px',
-    sm: '8px',
-    md: '16px',
-    lg: '24px',
-    xl: '32px',
-  },
-  borders: {
-    radiusSmall: '4px',
-    radiusMedium: '8px',
-    radiusLarge: '12px',
-    radiusFull: '9999px',
-    width: '1px',
-  },
+  spacing: { unit: 4, xs: '4px', sm: '8px', md: '16px', lg: '24px', xl: '32px' },
+  borders: { radiusSmall: '4px', radiusMedium: '8px', radiusLarge: '12px', radiusFull: '9999px', width: '1px' },
 };
 
-const DEFAULT_SETTINGS: AppSettings = {
-  showNavigation: true,
-  enableSearch: true,
-  enableNotifications: true,
-  enableOfflineMode: false,
-  sessionTimeout: 3600,
-  requireAuth: true,
-};
-
-const DEFAULT_PAGE_SETTINGS: PageSettings = {
+const DEFAULT_PAGE_SETTINGS = {
   fullWidth: false,
   padding: 'medium',
   requireAuth: true,
@@ -92,510 +66,609 @@ const DEFAULT_PAGE_SETTINGS: PageSettings = {
 };
 
 // ============================================================================
-// App Builder Service
+// Helper: Convert Prisma App record to Application shape for frontend
+// ============================================================================
+
+function toApplication(record: any): any {
+  const def: AppDefinition = (record.definition as any) || {};
+
+  return {
+    id: record.id,
+    name: record.name,
+    slug: record.slug,
+    description: record.description,
+    icon: record.icon,
+    type: def.type || 'internal',
+    pages: def.pages || [],
+    navigation: def.navigation
+      ? { type: 'sidebar', position: 'left', collapsed: false, items: def.navigation }
+      : { type: 'sidebar', position: 'left', collapsed: false, items: [] },
+    settings: {
+      showNavigation: true,
+      enableSearch: true,
+      enableNotifications: true,
+      enableOfflineMode: false,
+      sessionTimeout: 3600,
+      requireAuth: true,
+      ...(record.settings as any || {}),
+    },
+    theme: def.theme || { ...DEFAULT_THEME },
+    dataSources: def.dataSources || [],
+    version: record.version,
+    status: record.status?.toLowerCase() || 'draft',
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    createdBy: record.createdBy,
+    publishedAt: record.publishedAt,
+  };
+}
+
+// ============================================================================
+// App Builder Service (Prisma-backed)
 // ============================================================================
 
 export class AppBuilderService {
 
-  // ============================================================================
+  // ==========================================================================
   // Application CRUD
-  // ============================================================================
+  // ==========================================================================
 
   async createApp(input: {
+    accountId: string;
     name: string;
     description?: string;
     type?: 'internal' | 'portal';
     createdBy: string;
-  }): Promise<Application> {
-    const id = randomUUID();
-    const now = new Date();
-
-    const homePage: AppPage = {
-      id: randomUUID(),
-      name: 'Home',
-      slug: 'home',
-      icon: 'home',
-      layout: 'single-column',
-      components: [
+  }): Promise<any> {
+    const homePageId = randomUUID();
+    const definition: AppDefinition = {
+      type: input.type || 'internal',
+      theme: { ...DEFAULT_THEME },
+      navigation: [
+        { id: randomUUID(), type: 'page', label: 'Home', icon: 'home', pageId: homePageId },
+      ],
+      pages: [
         {
-          id: randomUUID(),
-          type: 'heading',
-          name: 'Welcome',
-          position: { row: 0, column: 0, width: 12 },
-          props: { content: `Welcome to ${input.name}`, level: 'h1', align: 'center' },
-        },
-        {
-          id: randomUUID(),
-          type: 'text',
-          name: 'Description',
-          position: { row: 1, column: 0, width: 12 },
-          props: { content: 'Start building your app by adding components to this page.', align: 'center' },
+          id: homePageId,
+          name: 'Home',
+          slug: 'home',
+          icon: 'home',
+          layout: 'single-column',
+          components: [
+            {
+              id: randomUUID(),
+              type: 'heading',
+              name: 'Welcome',
+              position: { row: 0, column: 0, width: 12 },
+              props: { content: `Welcome to ${input.name}`, level: 'h1', align: 'center' },
+            },
+            {
+              id: randomUUID(),
+              type: 'text',
+              name: 'Description',
+              position: { row: 1, column: 0, width: 12 },
+              props: { content: 'Start building your app by adding components to this page.', align: 'center' },
+            },
+          ],
+          settings: { ...DEFAULT_PAGE_SETTINGS },
+          pageVariables: [],
         },
       ],
-      settings: { ...DEFAULT_PAGE_SETTINGS },
-      pageVariables: [],
-    };
-
-    const app: Application = {
-      id,
-      name: input.name,
-      slug: this.generateSlug(input.name),
-      description: input.description,
-      type: input.type || 'internal',
-      pages: [homePage],
-      navigation: {
-        type: 'sidebar',
-        position: 'left',
-        collapsed: false,
-        items: [
-          { id: randomUUID(), type: 'page', label: 'Home', icon: 'home', pageId: homePage.id },
-        ],
-      },
-      settings: { ...DEFAULT_SETTINGS, defaultPage: homePage.id },
-      theme: { ...DEFAULT_THEME },
       dataSources: [],
-      version: 1,
-      status: 'draft',
-      createdAt: now,
-      updatedAt: now,
-      createdBy: input.createdBy,
     };
 
-    apps.set(id, app);
-    return app;
+    const record = await prisma.app.create({
+      data: {
+        accountId: input.accountId,
+        name: input.name,
+        slug: this.generateSlug(input.name),
+        description: input.description,
+        definition: definition as any,
+        settings: {},
+        permissions: {},
+        status: 'DRAFT',
+        version: 1,
+        createdBy: input.createdBy,
+      },
+    });
+
+    return toApplication(record);
   }
 
-  async getApp(id: string): Promise<Application | null> {
-    return apps.get(id) || null;
+  async getApp(id: string): Promise<any | null> {
+    const record = await prisma.app.findUnique({ where: { id } });
+    if (!record) return null;
+    return toApplication(record);
   }
 
-  async getAppBySlug(slug: string): Promise<Application | null> {
-    for (const app of apps.values()) {
-      if (app.slug === slug) return app;
-    }
-    return null;
+  async getAppBySlug(accountId: string, slug: string): Promise<any | null> {
+    const record = await prisma.app.findUnique({
+      where: { accountId_slug: { accountId, slug } },
+    });
+    if (!record) return null;
+    return toApplication(record);
   }
 
-  async listApps(options: {
-    type?: 'internal' | 'portal';
-    status?: 'draft' | 'published' | 'archived';
+  async listApps(accountId: string, options: {
+    type?: string;
+    status?: string;
     search?: string;
     page?: number;
     pageSize?: number;
-  } = {}): Promise<{ apps: Application[]; total: number }> {
-    let items = Array.from(apps.values());
+  } = {}): Promise<{ apps: any[]; total: number }> {
+    const where: any = { accountId };
 
-    if (options.type) {
-      items = items.filter(a => a.type === options.type);
-    }
     if (options.status) {
-      items = items.filter(a => a.status === options.status);
+      where.status = options.status.toUpperCase();
     }
     if (options.search) {
-      const search = options.search.toLowerCase();
-      items = items.filter(a =>
-        a.name.toLowerCase().includes(search) ||
-        a.description?.toLowerCase().includes(search)
-      );
+      where.OR = [
+        { name: { contains: options.search, mode: 'insensitive' } },
+        { description: { contains: options.search, mode: 'insensitive' } },
+      ];
     }
-
-    items.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
     const page = options.page || 1;
-    const pageSize = options.pageSize || 20;
-    const start = (page - 1) * pageSize;
+    const pageSize = options.pageSize || 50;
 
-    return {
-      apps: items.slice(start, start + pageSize),
-      total: items.length,
-    };
+    const [records, total] = await Promise.all([
+      prisma.app.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.app.count({ where }),
+    ]);
+
+    let apps = records.map(toApplication);
+
+    // Filter by type from definition JSON (can't filter in Prisma query directly)
+    if (options.type) {
+      apps = apps.filter((a: any) => a.type === options.type);
+    }
+
+    return { apps, total };
   }
 
-  async updateApp(
-    id: string,
-    input: Partial<Pick<Application, 'name' | 'description' | 'settings' | 'theme' | 'navigation'>>
-  ): Promise<Application | null> {
-    const app = apps.get(id);
-    if (!app) return null;
+  async updateApp(id: string, input: any): Promise<any | null> {
+    const existing = await prisma.app.findUnique({ where: { id } });
+    if (!existing) return null;
+
+    const def: AppDefinition = (existing.definition as any) || {};
+    const updateData: any = { updatedAt: new Date() };
 
     if (input.name) {
-      app.name = input.name;
-      app.slug = this.generateSlug(input.name);
+      updateData.name = input.name;
+      updateData.slug = this.generateSlug(input.name);
     }
-    if (input.description !== undefined) app.description = input.description;
-    if (input.settings) app.settings = { ...app.settings, ...input.settings };
-    if (input.theme) app.theme = { ...app.theme, ...input.theme };
-    if (input.navigation) app.navigation = input.navigation;
+    if (input.description !== undefined) {
+      updateData.description = input.description;
+    }
+    if (input.settings) {
+      updateData.settings = { ...(existing.settings as any || {}), ...input.settings };
+    }
 
-    app.updatedAt = new Date();
-    apps.set(id, app);
-    return app;
+    // Update definition fields
+    let defChanged = false;
+    if (input.theme) {
+      def.theme = { ...(def.theme || {}), ...input.theme };
+      defChanged = true;
+    }
+    if (input.navigation) {
+      // Accept both { items: [...] } and raw array
+      def.navigation = Array.isArray(input.navigation) ? input.navigation : input.navigation.items || input.navigation;
+      defChanged = true;
+    }
+    if (input.pages) {
+      def.pages = input.pages;
+      defChanged = true;
+    }
+    if (defChanged) {
+      updateData.definition = def as any;
+    }
+
+    const record = await prisma.app.update({ where: { id }, data: updateData });
+    return toApplication(record);
   }
 
   async deleteApp(id: string): Promise<boolean> {
-    return apps.delete(id);
+    try {
+      await prisma.app.delete({ where: { id } });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
-  async publishApp(id: string, publishedBy: string): Promise<Application | null> {
-    const app = apps.get(id);
-    if (!app) return null;
+  async publishApp(id: string, publishedBy: string): Promise<any | null> {
+    const existing = await prisma.app.findUnique({ where: { id } });
+    if (!existing) return null;
 
-    app.status = 'published';
-    app.version++;
-    app.publishedAt = new Date();
-    app.publishedBy = publishedBy;
-    app.updatedAt = new Date();
-
-    apps.set(id, app);
-    return app;
+    const record = await prisma.app.update({
+      where: { id },
+      data: {
+        status: 'PUBLISHED',
+        version: existing.version + 1,
+        publishedAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+    return toApplication(record);
   }
 
-  async unpublishApp(id: string): Promise<Application | null> {
-    const app = apps.get(id);
-    if (!app) return null;
+  async unpublishApp(id: string): Promise<any | null> {
+    const existing = await prisma.app.findUnique({ where: { id } });
+    if (!existing) return null;
 
-    app.status = 'draft';
-    app.updatedAt = new Date();
-    apps.set(id, app);
-    return app;
+    const record = await prisma.app.update({
+      where: { id },
+      data: { status: 'DRAFT', updatedAt: new Date() },
+    });
+    return toApplication(record);
   }
 
-  // ============================================================================
-  // Page Management
-  // ============================================================================
+  async duplicateApp(appId: string, newName: string, accountId: string, createdBy: string): Promise<any | null> {
+    const original = await prisma.app.findUnique({ where: { id: appId } });
+    if (!original) return null;
 
-  async addPage(appId: string, page: Omit<AppPage, 'id'>): Promise<AppPage | null> {
-    const app = apps.get(appId);
-    if (!app) return null;
+    const def: AppDefinition = JSON.parse(JSON.stringify(original.definition || {}));
 
-    const newPage: AppPage = {
+    // Regenerate page IDs and component IDs
+    const pageIdMap = new Map<string, string>();
+    if (def.pages) {
+      def.pages = def.pages.map((page: any) => {
+        const newPageId = randomUUID();
+        pageIdMap.set(page.id, newPageId);
+        return {
+          ...page,
+          id: newPageId,
+          components: this.regenerateComponentIds(page.components || []),
+        };
+      });
+    }
+
+    // Update navigation page references
+    if (def.navigation) {
+      def.navigation = def.navigation.map((item: any) => ({
+        ...item,
+        id: randomUUID(),
+        pageId: item.pageId ? (pageIdMap.get(item.pageId) || item.pageId) : undefined,
+      }));
+    }
+
+    const record = await prisma.app.create({
+      data: {
+        accountId,
+        name: newName,
+        slug: this.generateSlug(newName),
+        description: original.description,
+        icon: original.icon,
+        definition: def as any,
+        settings: original.settings || {},
+        permissions: original.permissions || {},
+        status: 'DRAFT',
+        version: 1,
+        createdBy,
+      },
+    });
+
+    return toApplication(record);
+  }
+
+  // ==========================================================================
+  // Page Management (operates on definition.pages)
+  // ==========================================================================
+
+  async addPage(appId: string, page: any): Promise<any | null> {
+    const existing = await prisma.app.findUnique({ where: { id: appId } });
+    if (!existing) return null;
+
+    const def: AppDefinition = (existing.definition as any) || {};
+    const pages = def.pages || [];
+
+    const newPage = {
       ...page,
-      id: randomUUID(),
+      id: page.id || randomUUID(),
       slug: page.slug || this.generateSlug(page.name),
       settings: page.settings || { ...DEFAULT_PAGE_SETTINGS },
       components: page.components || [],
       pageVariables: page.pageVariables || [],
     };
 
-    app.pages.push(newPage);
+    pages.push(newPage);
+    def.pages = pages;
 
     // Add to navigation
-    if (newPage.settings.showInNavigation) {
-      app.navigation.items.push({
-        id: randomUUID(),
-        type: 'page',
-        label: newPage.name,
-        icon: newPage.icon,
-        pageId: newPage.id,
-      });
+    if (newPage.settings?.showInNavigation !== false) {
+      const nav = def.navigation || [];
+      nav.push({ id: randomUUID(), type: 'page', label: newPage.name, icon: newPage.icon, pageId: newPage.id });
+      def.navigation = nav;
     }
 
-    app.updatedAt = new Date();
-    apps.set(appId, app);
+    await prisma.app.update({ where: { id: appId }, data: { definition: def as any, updatedAt: new Date() } });
     return newPage;
   }
 
-  async getPage(appId: string, pageId: string): Promise<AppPage | null> {
-    const app = apps.get(appId);
-    if (!app) return null;
-    return app.pages.find(p => p.id === pageId) || null;
+  async getPage(appId: string, pageId: string): Promise<any | null> {
+    const existing = await prisma.app.findUnique({ where: { id: appId } });
+    if (!existing) return null;
+
+    const def: AppDefinition = (existing.definition as any) || {};
+    return (def.pages || []).find((p: any) => p.id === pageId) || null;
   }
 
-  async updatePage(
-    appId: string,
-    pageId: string,
-    updates: Partial<Omit<AppPage, 'id'>>
-  ): Promise<AppPage | null> {
-    const app = apps.get(appId);
-    if (!app) return null;
+  async updatePage(appId: string, pageId: string, updates: any): Promise<any | null> {
+    const existing = await prisma.app.findUnique({ where: { id: appId } });
+    if (!existing) return null;
 
-    const page = app.pages.find(p => p.id === pageId);
+    const def: AppDefinition = (existing.definition as any) || {};
+    const pages = def.pages || [];
+    const page = pages.find((p: any) => p.id === pageId);
     if (!page) return null;
 
     Object.assign(page, updates);
     if (updates.name && !updates.slug) {
       page.slug = this.generateSlug(updates.name);
     }
+    def.pages = pages;
 
-    app.updatedAt = new Date();
-    apps.set(appId, app);
+    await prisma.app.update({ where: { id: appId }, data: { definition: def as any, updatedAt: new Date() } });
     return page;
   }
 
   async deletePage(appId: string, pageId: string): Promise<boolean> {
-    const app = apps.get(appId);
-    if (!app) return false;
+    const existing = await prisma.app.findUnique({ where: { id: appId } });
+    if (!existing) return false;
 
-    const index = app.pages.findIndex(p => p.id === pageId);
-    if (index === -1) return false;
+    const def: AppDefinition = (existing.definition as any) || {};
+    const pages = def.pages || [];
+    const idx = pages.findIndex((p: any) => p.id === pageId);
+    if (idx === -1) return false;
 
-    app.pages.splice(index, 1);
+    pages.splice(idx, 1);
+    def.pages = pages;
 
     // Remove from navigation
-    app.navigation.items = app.navigation.items.filter(item => item.pageId !== pageId);
+    if (def.navigation) {
+      def.navigation = def.navigation.filter((item: any) => item.pageId !== pageId);
+    }
 
-    app.updatedAt = new Date();
-    apps.set(appId, app);
+    await prisma.app.update({ where: { id: appId }, data: { definition: def as any, updatedAt: new Date() } });
     return true;
   }
 
   async reorderPages(appId: string, pageIds: string[]): Promise<boolean> {
-    const app = apps.get(appId);
-    if (!app) return false;
+    const existing = await prisma.app.findUnique({ where: { id: appId } });
+    if (!existing) return false;
 
-    const pageMap = new Map(app.pages.map(p => [p.id, p]));
-    app.pages = pageIds.map(id => pageMap.get(id)).filter(Boolean) as AppPage[];
+    const def: AppDefinition = (existing.definition as any) || {};
+    const pages = def.pages || [];
+    const pageMap = new Map(pages.map((p: any) => [p.id, p]));
+    def.pages = pageIds.map(id => pageMap.get(id)).filter(Boolean) as any[];
 
-    app.updatedAt = new Date();
-    apps.set(appId, app);
+    await prisma.app.update({ where: { id: appId }, data: { definition: def as any, updatedAt: new Date() } });
     return true;
   }
 
-  // ============================================================================
-  // Component Management
-  // ============================================================================
+  // ==========================================================================
+  // Component Management (operates on definition.pages[].components)
+  // ==========================================================================
 
-  async addComponent(
-    appId: string,
-    pageId: string,
-    component: Omit<PageComponent, 'id'>
-  ): Promise<PageComponent | null> {
-    const app = apps.get(appId);
-    if (!app) return null;
+  async addComponent(appId: string, pageId: string, component: any): Promise<any | null> {
+    const existing = await prisma.app.findUnique({ where: { id: appId } });
+    if (!existing) return null;
 
-    const page = app.pages.find(p => p.id === pageId);
+    const def: AppDefinition = (existing.definition as any) || {};
+    const page = (def.pages || []).find((p: any) => p.id === pageId);
     if (!page) return null;
 
-    // Get default props from registry
     const definition = componentRegistry.getComponent(component.type);
     const defaultProps = definition?.defaultProps || {};
 
-    const newComponent: PageComponent = {
+    const newComponent = {
       ...component,
       id: randomUUID(),
       props: { ...defaultProps, ...component.props },
       visible: component.visible ?? true,
     };
 
+    page.components = page.components || [];
     page.components.push(newComponent);
-    app.updatedAt = new Date();
-    apps.set(appId, app);
+
+    await prisma.app.update({ where: { id: appId }, data: { definition: def as any, updatedAt: new Date() } });
     return newComponent;
   }
 
-  async getComponent(appId: string, pageId: string, componentId: string): Promise<PageComponent | null> {
+  async getComponent(appId: string, pageId: string, componentId: string): Promise<any | null> {
     const page = await this.getPage(appId, pageId);
     if (!page) return null;
 
-    const findComponent = (components: PageComponent[]): PageComponent | null => {
+    const findComp = (components: any[]): any | null => {
       for (const comp of components) {
         if (comp.id === componentId) return comp;
         if (comp.children) {
-          const found = findComponent(comp.children);
+          const found = findComp(comp.children);
           if (found) return found;
         }
       }
       return null;
     };
-
-    return findComponent(page.components);
+    return findComp(page.components || []);
   }
 
-  async updateComponent(
-    appId: string,
-    pageId: string,
-    componentId: string,
-    updates: Partial<Omit<PageComponent, 'id'>>
-  ): Promise<PageComponent | null> {
-    const app = apps.get(appId);
-    if (!app) return null;
+  async updateComponent(appId: string, pageId: string, componentId: string, updates: any): Promise<any | null> {
+    const existing = await prisma.app.findUnique({ where: { id: appId } });
+    if (!existing) return null;
 
-    const page = app.pages.find(p => p.id === pageId);
+    const def: AppDefinition = (existing.definition as any) || {};
+    const page = (def.pages || []).find((p: any) => p.id === pageId);
     if (!page) return null;
 
-    const updateInList = (components: PageComponent[]): boolean => {
-      for (let i = 0; i < components.length; i++) {
-        const comp = components[i]!;
+    const updateInList = (components: any[]): boolean => {
+      for (const comp of components) {
         if (comp.id === componentId) {
           Object.assign(comp, updates);
           return true;
         }
-        if (comp.children && updateInList(comp.children)) {
-          return true;
-        }
+        if (comp.children && updateInList(comp.children)) return true;
       }
       return false;
     };
 
-    if (!updateInList(page.components)) return null;
+    if (!updateInList(page.components || [])) return null;
 
-    app.updatedAt = new Date();
-    apps.set(appId, app);
+    await prisma.app.update({ where: { id: appId }, data: { definition: def as any, updatedAt: new Date() } });
     return this.getComponent(appId, pageId, componentId);
   }
 
   async deleteComponent(appId: string, pageId: string, componentId: string): Promise<boolean> {
-    const app = apps.get(appId);
-    if (!app) return false;
+    const existing = await prisma.app.findUnique({ where: { id: appId } });
+    if (!existing) return false;
 
-    const page = app.pages.find(p => p.id === pageId);
+    const def: AppDefinition = (existing.definition as any) || {};
+    const page = (def.pages || []).find((p: any) => p.id === pageId);
     if (!page) return false;
 
-    const deleteFromList = (components: PageComponent[]): boolean => {
-      const index = components.findIndex(c => c.id === componentId);
-      if (index !== -1) {
-        components.splice(index, 1);
-        return true;
-      }
+    const deleteFromList = (components: any[]): boolean => {
+      const index = components.findIndex((c: any) => c.id === componentId);
+      if (index !== -1) { components.splice(index, 1); return true; }
       for (const comp of components) {
-        if (comp.children && deleteFromList(comp.children)) {
-          return true;
-        }
+        if (comp.children && deleteFromList(comp.children)) return true;
       }
       return false;
     };
 
-    if (!deleteFromList(page.components)) return false;
+    if (!deleteFromList(page.components || [])) return false;
 
-    app.updatedAt = new Date();
-    apps.set(appId, app);
+    await prisma.app.update({ where: { id: appId }, data: { definition: def as any, updatedAt: new Date() } });
     return true;
   }
 
-  async moveComponent(
-    appId: string,
-    pageId: string,
-    componentId: string,
-    newPosition: { row: number; column: number; width?: number }
-  ): Promise<PageComponent | null> {
+  async moveComponent(appId: string, pageId: string, componentId: string, newPosition: any): Promise<any | null> {
     return this.updateComponent(appId, pageId, componentId, {
       position: { ...newPosition, width: newPosition.width || 12 },
     });
   }
 
-  // ============================================================================
+  // ==========================================================================
   // Data Source Management
-  // ============================================================================
+  // ==========================================================================
 
-  async addDataSource(appId: string, dataSource: Omit<DataSourceConfig, 'id'>): Promise<DataSourceConfig | null> {
-    const app = apps.get(appId);
-    if (!app) return null;
+  async addDataSource(appId: string, dataSource: any): Promise<any | null> {
+    const existing = await prisma.app.findUnique({ where: { id: appId } });
+    if (!existing) return null;
 
-    const newDataSource: DataSourceConfig = {
-      ...dataSource,
-      id: randomUUID(),
-    };
+    const def: AppDefinition = (existing.definition as any) || {};
+    const dataSources = def.dataSources || [];
+    const newDs = { ...dataSource, id: randomUUID() };
+    dataSources.push(newDs);
+    def.dataSources = dataSources;
 
-    app.dataSources.push(newDataSource);
-    app.updatedAt = new Date();
-    apps.set(appId, app);
-    return newDataSource;
+    await prisma.app.update({ where: { id: appId }, data: { definition: def as any, updatedAt: new Date() } });
+    return newDs;
   }
 
-  async updateDataSource(
-    appId: string,
-    dataSourceId: string,
-    updates: Partial<Omit<DataSourceConfig, 'id'>>
-  ): Promise<DataSourceConfig | null> {
-    const app = apps.get(appId);
-    if (!app) return null;
+  async updateDataSource(appId: string, dataSourceId: string, updates: any): Promise<any | null> {
+    const existing = await prisma.app.findUnique({ where: { id: appId } });
+    if (!existing) return null;
 
-    const ds = app.dataSources.find(d => d.id === dataSourceId);
+    const def: AppDefinition = (existing.definition as any) || {};
+    const ds = (def.dataSources || []).find((d: any) => d.id === dataSourceId);
     if (!ds) return null;
 
     Object.assign(ds, updates);
-    app.updatedAt = new Date();
-    apps.set(appId, app);
+    await prisma.app.update({ where: { id: appId }, data: { definition: def as any, updatedAt: new Date() } });
     return ds;
   }
 
   async deleteDataSource(appId: string, dataSourceId: string): Promise<boolean> {
-    const app = apps.get(appId);
-    if (!app) return false;
+    const existing = await prisma.app.findUnique({ where: { id: appId } });
+    if (!existing) return false;
 
-    const index = app.dataSources.findIndex(d => d.id === dataSourceId);
-    if (index === -1) return false;
+    const def: AppDefinition = (existing.definition as any) || {};
+    const dataSources = def.dataSources || [];
+    const idx = dataSources.findIndex((d: any) => d.id === dataSourceId);
+    if (idx === -1) return false;
 
-    app.dataSources.splice(index, 1);
-    app.updatedAt = new Date();
-    apps.set(appId, app);
+    dataSources.splice(idx, 1);
+    def.dataSources = dataSources;
+    await prisma.app.update({ where: { id: appId }, data: { definition: def as any, updatedAt: new Date() } });
     return true;
   }
 
-  // ============================================================================
+  // ==========================================================================
   // Theme Management
-  // ============================================================================
+  // ==========================================================================
 
-  async updateTheme(appId: string, theme: Partial<ThemeConfig>): Promise<ThemeConfig | null> {
-    const app = apps.get(appId);
-    if (!app) return null;
+  async updateTheme(appId: string, theme: any): Promise<any | null> {
+    const existing = await prisma.app.findUnique({ where: { id: appId } });
+    if (!existing) return null;
 
-    app.theme = {
-      ...app.theme,
+    const def: AppDefinition = (existing.definition as any) || {};
+    const currentTheme = def.theme || { ...DEFAULT_THEME };
+    def.theme = {
+      ...currentTheme,
       ...theme,
-      colors: { ...app.theme.colors, ...theme.colors },
-      typography: { ...app.theme.typography, ...theme.typography },
-      spacing: { ...app.theme.spacing, ...theme.spacing },
-      borders: { ...app.theme.borders, ...theme.borders },
+      colors: { ...currentTheme.colors, ...theme.colors },
+      typography: { ...currentTheme.typography, ...theme.typography },
+      spacing: { ...currentTheme.spacing, ...theme.spacing },
+      borders: { ...currentTheme.borders, ...theme.borders },
     };
 
-    app.updatedAt = new Date();
-    apps.set(appId, app);
-    return app.theme;
+    await prisma.app.update({ where: { id: appId }, data: { definition: def as any, updatedAt: new Date() } });
+    return def.theme;
   }
 
-  async resetTheme(appId: string): Promise<ThemeConfig | null> {
-    const app = apps.get(appId);
-    if (!app) return null;
+  async resetTheme(appId: string): Promise<any | null> {
+    const existing = await prisma.app.findUnique({ where: { id: appId } });
+    if (!existing) return null;
 
-    app.theme = { ...DEFAULT_THEME };
-    app.updatedAt = new Date();
-    apps.set(appId, app);
-    return app.theme;
+    const def: AppDefinition = (existing.definition as any) || {};
+    def.theme = { ...DEFAULT_THEME };
+    await prisma.app.update({ where: { id: appId }, data: { definition: def as any, updatedAt: new Date() } });
+    return def.theme;
   }
 
-  // ============================================================================
+  // ==========================================================================
   // Portal-Specific
-  // ============================================================================
+  // ==========================================================================
 
   async createPortal(input: {
+    accountId: string;
     name: string;
     description?: string;
     customDomain?: string;
     createdBy: string;
-  }): Promise<Portal> {
-    const app = await this.createApp({
-      ...input,
-      type: 'portal',
-    }) as Portal;
-
-    app.portalSettings = {
-      showFooter: true,
-      showHeader: true,
-    };
-    app.registrationEnabled = false;
-    app.isPublic = true;
-
-    apps.set(app.id, app);
+  }): Promise<any> {
+    const app = await this.createApp({ ...input, type: 'portal' });
+    // Store portal settings in the definition
+    const existing = await prisma.app.findUnique({ where: { id: app.id } });
+    if (existing) {
+      const def: AppDefinition = (existing.definition as any) || {};
+      def.portalSettings = { showFooter: true, showHeader: true };
+      def.registrationEnabled = false;
+      def.isPublic = true;
+      await prisma.app.update({ where: { id: app.id }, data: { definition: def as any } });
+    }
     return app;
   }
 
-  async updatePortalSettings(
-    appId: string,
-    settings: Partial<PortalSettings>
-  ): Promise<PortalSettings | null> {
-    const app = apps.get(appId) as Portal;
-    if (!app || app.type !== 'portal') return null;
+  async updatePortalSettings(appId: string, settings: any): Promise<any | null> {
+    const existing = await prisma.app.findUnique({ where: { id: appId } });
+    if (!existing) return null;
 
-    app.portalSettings = { ...app.portalSettings, ...settings };
-    app.updatedAt = new Date();
-    apps.set(appId, app);
-    return app.portalSettings;
+    const def: AppDefinition = (existing.definition as any) || {};
+    if (def.type !== 'portal') return null;
+
+    def.portalSettings = { ...(def.portalSettings || {}), ...settings };
+    await prisma.app.update({ where: { id: appId }, data: { definition: def as any, updatedAt: new Date() } });
+    return def.portalSettings;
   }
 
-  // ============================================================================
+  // ==========================================================================
   // Helpers
-  // ============================================================================
+  // ==========================================================================
 
   private generateSlug(name: string): string {
     return name
@@ -604,46 +677,8 @@ export class AppBuilderService {
       .replace(/^-|-$/g, '');
   }
 
-  async duplicateApp(appId: string, newName: string, createdBy: string): Promise<Application | null> {
-    const original = apps.get(appId);
-    if (!original) return null;
-
-    const duplicate: Application = JSON.parse(JSON.stringify(original));
-    duplicate.id = randomUUID();
-    duplicate.name = newName;
-    duplicate.slug = this.generateSlug(newName);
-    duplicate.status = 'draft';
-    duplicate.version = 1;
-    duplicate.createdAt = new Date();
-    duplicate.updatedAt = new Date();
-    duplicate.createdBy = createdBy;
-    delete duplicate.publishedAt;
-    delete duplicate.publishedBy;
-
-    // Generate new IDs for pages and components
-    duplicate.pages = duplicate.pages.map(page => ({
-      ...page,
-      id: randomUUID(),
-      components: this.regenerateComponentIds(page.components),
-    }));
-
-    // Update navigation page references
-    const pageIdMap = new Map<string, string>();
-    original.pages.forEach((op, i) => {
-      pageIdMap.set(op.id, duplicate.pages[i]!.id);
-    });
-    duplicate.navigation.items = duplicate.navigation.items.map(item => ({
-      ...item,
-      id: randomUUID(),
-      pageId: item.pageId ? pageIdMap.get(item.pageId) : undefined,
-    }));
-
-    apps.set(duplicate.id, duplicate);
-    return duplicate;
-  }
-
-  private regenerateComponentIds(components: PageComponent[]): PageComponent[] {
-    return components.map(comp => ({
+  private regenerateComponentIds(components: any[]): any[] {
+    return components.map((comp: any) => ({
       ...comp,
       id: randomUUID(),
       children: comp.children ? this.regenerateComponentIds(comp.children) : undefined,

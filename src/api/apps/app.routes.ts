@@ -6,22 +6,37 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { appBuilderService } from '../../services/apps/app-builder.service';
 import { componentRegistry } from '../../services/apps/component-registry';
+import { prisma } from '../../utils/prisma.js';
 
 interface IdParams { id: string; }
 interface PageParams extends IdParams { pageId: string; }
 interface ComponentParams extends PageParams { componentId: string; }
 interface DataSourceParams extends IdParams { dataSourceId: string; }
 
+// Cache demo account ID to avoid repeated DB lookups
+let demoAccountId: string | null = null;
+
+async function getAccountId(request: any): Promise<string> {
+  if (request.accountId) return request.accountId;
+  if (demoAccountId) return demoAccountId;
+  const demo = await prisma.account.findFirst({ where: { slug: 'demo' } });
+  if (demo) { demoAccountId = demo.id; return demo.id; }
+  return 'demo'; // last resort
+}
+
 export async function appRoutes(fastify: FastifyInstance) {
   const service = appBuilderService;
 
   // App CRUD
   fastify.get('/', async (request: FastifyRequest<{ Querystring: { type?: string; status?: string; search?: string } }>) => {
-    return service.listApps(request.query as any);
+    const accountId = await getAccountId(request);
+    return service.listApps(accountId, request.query as any);
   });
 
   fastify.post<{ Body: { name: string; description?: string; type?: 'internal' | 'portal' } }>('/', async (request, reply) => {
-    const app = await service.createApp({ ...request.body, createdBy: 'user-1' });
+    const accountId = await getAccountId(request);
+    const userId = (request as any).user?.id || 'system';
+    const app = await service.createApp({ accountId, ...request.body, createdBy: userId });
     return reply.status(201).send(app);
   });
 
@@ -43,7 +58,8 @@ export async function appRoutes(fastify: FastifyInstance) {
   });
 
   fastify.post<{ Params: IdParams }>('/:id/publish', async (request, reply) => {
-    const app = await service.publishApp(request.params.id, 'user-1');
+    const userId = (request as any).user?.id || 'system';
+    const app = await service.publishApp(request.params.id, userId);
     if (!app) return reply.status(404).send({ error: 'App not found' });
     return app;
   });
@@ -55,7 +71,9 @@ export async function appRoutes(fastify: FastifyInstance) {
   });
 
   fastify.post<{ Params: IdParams; Body: { name: string } }>('/:id/duplicate', async (request, reply) => {
-    const app = await service.duplicateApp(request.params.id, request.body.name, 'user-1');
+    const accountId = await getAccountId(request);
+    const userId = (request as any).user?.id || 'system';
+    const app = await service.duplicateApp(request.params.id, request.body.name, accountId, userId);
     if (!app) return reply.status(404).send({ error: 'App not found' });
     return reply.status(201).send(app);
   });
@@ -150,7 +168,9 @@ export async function appRoutes(fastify: FastifyInstance) {
 
   // Portal
   fastify.post<{ Body: { name: string; description?: string; customDomain?: string } }>('/portals', async (request, reply) => {
-    const portal = await service.createPortal({ ...request.body, createdBy: 'user-1' });
+    const accountId = await getAccountId(request);
+    const userId = (request as any).user?.id || 'system';
+    const portal = await service.createPortal({ accountId, ...request.body, createdBy: userId });
     return reply.status(201).send(portal);
   });
 
