@@ -463,13 +463,53 @@ export class WorkflowService {
     triggeredBy: string = 'system',
     triggerType: string = 'manual'
   ): Promise<WorkflowExecution> {
-    const workflow = workflows.get(workflowId);
+    let workflow = workflows.get(workflowId);
+
+    // If not in memory, try loading from Prisma DB (seeded workflows)
+    if (!workflow) {
+      try {
+        const { prisma } = await import('../../utils/prisma.js');
+        const process = await prisma.process.findUnique({
+          where: { id: workflowId },
+        });
+
+        if (process) {
+          const definition = (process as any).definition as any || {};
+          const dbNodes = Array.isArray(definition.nodes) ? definition.nodes : [];
+          const dbEdges = Array.isArray(definition.edges) ? definition.edges : [];
+
+          workflow = {
+            id: process.id,
+            name: process.name,
+            slug: process.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+            description: process.description || undefined,
+            version: process.version,
+            status: (process.status?.toLowerCase() as any) || 'draft',
+            nodes: dbNodes,
+            edges: dbEdges,
+            triggers: definition.triggers || [],
+            variables: definition.variables || [],
+            settings: { timeout: 3600, retryPolicy: { enabled: true, maxAttempts: 3, backoffType: 'exponential' as const, initialDelay: 1000, maxDelay: 60000 }, errorHandling: 'stop' as const, logging: 'standard' as const, concurrency: 10, priority: 'normal' as const },
+            createdAt: process.createdAt,
+            updatedAt: process.updatedAt,
+            createdBy: process.createdBy || 'system',
+          };
+
+          // Cache it in memory for future use
+          workflows.set(workflowId, workflow);
+        }
+      } catch (err) {
+        // DB lookup failed, fall through to error below
+      }
+    }
+
     if (!workflow) {
       throw new Error(`Workflow ${workflowId} not found`);
     }
 
-    if (workflow.status !== 'published') {
-      throw new Error('Can only execute published workflows');
+    // Allow manual/test executions even for draft workflows
+    if (workflow.status !== 'published' && triggerType !== 'manual') {
+      throw new Error('Can only execute published workflows. Use the designer to test draft workflows.');
     }
 
     const execution = await this.engine.startExecution(

@@ -30,6 +30,7 @@ import {
     getWorkflow,
     createWorkflow,
     saveWorkflowDefinition,
+    executeWorkflow,
 } from '../../api/workflows';
 import { validateWorkflow, type ValidationResult } from './utils/validation';
 import type { NodeType, Workflow } from '../../types';
@@ -95,9 +96,11 @@ function WorkflowDesignerInner() {
     // UI state
     const [isLoading, setIsLoading] = useState(!!id);
     const [isSaving, setIsSaving] = useState(false);
+    const [isRunning, setIsRunning] = useState(false);
     const [isDragOver, setIsDragOver] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [executionResult, setExecutionResult] = useState<{ success: boolean; data?: any; error?: string } | null>(null);
 
     // Validation state
     const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
@@ -335,6 +338,40 @@ function WorkflowDesignerInner() {
         }
     }, [workflow, id, workflowName, nodes, edges, navigate]);
 
+    // Run workflow
+    const handleRun = useCallback(async () => {
+        setIsRunning(true);
+        setSaveError(null);
+        setExecutionResult(null);
+
+        try {
+            // Auto-save before running
+            let workflowId = workflow?.id || id;
+
+            if (!workflowId || workflowId === 'new') {
+                // Need to create + save first
+                await handleSave();
+                workflowId = workflow?.id || id;
+            } else if (hasUnsavedChanges) {
+                await handleSave();
+            }
+
+            if (!workflowId || workflowId === 'new') {
+                setSaveError('Could not determine workflow ID. Please save first.');
+                setIsRunning(false);
+                return;
+            }
+
+            const result = await executeWorkflow(workflowId);
+            setExecutionResult({ success: true, data: result });
+        } catch (error: any) {
+            const message = error?.response?.data?.error || error?.message || 'Execution failed';
+            setExecutionResult({ success: false, error: message });
+        } finally {
+            setIsRunning(false);
+        }
+    }, [workflow, id, hasUnsavedChanges, handleSave]);
+
     return (
         <div className="h-screen flex flex-col bg-surface-950">
             {/* Error Banner */}
@@ -417,9 +454,13 @@ function WorkflowDesignerInner() {
                         )}
                         Validate
                     </Button>
-                    <Button variant="primary" size="sm" disabled={isLoading}>
-                        <Play className="w-4 h-4 mr-2" />
-                        Run
+                    <Button variant="primary" size="sm" disabled={isLoading || isRunning} onClick={handleRun}>
+                        {isRunning ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                            <Play className="w-4 h-4 mr-2" />
+                        )}
+                        {isRunning ? 'Running...' : 'Run'}
                     </Button>
                 </div>
             </div>
@@ -516,6 +557,72 @@ function WorkflowDesignerInner() {
                     </div>
                 )}
             </div>
+
+            {/* Execution Result Modal */}
+            {executionResult && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-surface-800 border border-surface-600 rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+                        <div className="flex items-center gap-3 mb-4">
+                            {executionResult.success ? (
+                                <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                                    <CheckCircle className="w-5 h-5 text-green-400" />
+                                </div>
+                            ) : (
+                                <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                                    <AlertCircle className="w-5 h-5 text-red-400" />
+                                </div>
+                            )}
+                            <h2 className="text-lg font-semibold text-surface-100">
+                                {executionResult.success ? 'Workflow Executed' : 'Execution Failed'}
+                            </h2>
+                        </div>
+
+                        {executionResult.success && executionResult.data && (
+                            <div className="space-y-2 mb-6">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-surface-400">Execution ID</span>
+                                    <span className="text-surface-200 font-mono text-xs">
+                                        {executionResult.data.id?.slice(0, 8) || '—'}...
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-surface-400">Status</span>
+                                    <span className={cn(
+                                        'px-2 py-0.5 rounded-full text-xs font-medium',
+                                        executionResult.data.status === 'completed' && 'bg-green-500/20 text-green-300',
+                                        executionResult.data.status === 'running' && 'bg-blue-500/20 text-blue-300',
+                                        executionResult.data.status === 'failed' && 'bg-red-500/20 text-red-300',
+                                        executionResult.data.status === 'waiting' && 'bg-amber-500/20 text-amber-300',
+                                        !['completed', 'running', 'failed', 'waiting'].includes(executionResult.data.status) && 'bg-surface-600 text-surface-300'
+                                    )}>
+                                        {executionResult.data.status || 'unknown'}
+                                    </span>
+                                </div>
+                                {executionResult.data.currentNodes && executionResult.data.currentNodes.length > 0 && (
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-surface-400">Current Node</span>
+                                        <span className="text-surface-200">
+                                            {executionResult.data.currentNodes.join(', ')}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {!executionResult.success && executionResult.error && (
+                            <div className="mb-6 p-3 bg-red-900/30 border border-red-700/50 rounded-lg">
+                                <p className="text-sm text-red-300">{executionResult.error}</p>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-2">
+                            <Button variant="secondary" size="sm" onClick={() => setExecutionResult(null)}>
+                                Close
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

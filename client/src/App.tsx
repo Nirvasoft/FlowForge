@@ -4,7 +4,7 @@ import { AppShell } from './components/layout';
 import { LoginPage, RegisterPage } from './pages/auth';
 import { DashboardPage } from './pages/dashboard';
 import { UsersPage } from './pages/users';
-import { FormsPage, FormBuilderPage } from './pages/forms';
+import { FormsPage, FormBuilderPage, FormSubmissionsPage, FormFillPage } from './pages/forms';
 import { DatasetsPage } from './pages/datasets';
 import { WorkflowsPage } from './pages/workflows';
 import { WorkflowDesigner } from './pages/workflows/WorkflowDesigner';
@@ -36,6 +36,8 @@ function App() {
             <Route path="/forms" element={<FormsPage />} />
             <Route path="/forms/new" element={<FormBuilderPage />} />
             <Route path="/forms/:id/edit" element={<FormBuilderPage />} />
+            <Route path="/forms/:id/submissions" element={<FormSubmissionsPage />} />
+            <Route path="/forms/:id/fill" element={<FormFillPage />} />
             <Route path="/datasets" element={<DatasetsPage />} />
             <Route path="/workflows" element={<WorkflowsPage />} />
             <Route path="/apps" element={<AppsPage />} />

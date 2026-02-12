@@ -466,6 +466,9 @@ function FieldCard({
 // Preview renderer
 function renderFieldPreview(field: FormField) {
     const baseClass = "w-full px-3 py-2 bg-surface-800/50 border border-surface-700 rounded-lg text-surface-100 placeholder-surface-500";
+    // Safely extract display text from an option (string or {label,value} object)
+    const optionLabel = (opt: unknown): string =>
+        typeof opt === 'string' ? opt : ((opt as any)?.label ?? (opt as any)?.value ?? String(opt));
 
     switch (field.type) {
         case 'textarea':
@@ -474,7 +477,7 @@ function renderFieldPreview(field: FormField) {
             return (
                 <select className={baseClass} disabled>
                     <option value="">{field.placeholder || 'Select an option'}</option>
-                    {field.options?.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
+                    {field.options?.map((opt, i) => <option key={i} value={optionLabel(opt)}>{optionLabel(opt)}</option>)}
                 </select>
             );
         case 'radio':
@@ -483,7 +486,7 @@ function renderFieldPreview(field: FormField) {
                     {field.options?.map((opt, i) => (
                         <label key={i} className="flex items-center gap-2 text-sm text-surface-300">
                             <input type="radio" name={field.name} disabled className="text-primary-500" />
-                            {opt}
+                            {optionLabel(opt)}
                         </label>
                     ))}
                 </div>
@@ -494,7 +497,7 @@ function renderFieldPreview(field: FormField) {
                     {field.options?.map((opt, i) => (
                         <label key={i} className="flex items-center gap-2 text-sm text-surface-300">
                             <input type="checkbox" disabled className="text-primary-500" />
-                            {opt}
+                            {optionLabel(opt)}
                         </label>
                     ))}
                 </div>

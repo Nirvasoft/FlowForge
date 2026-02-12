@@ -9,7 +9,9 @@ import {
     Trash2,
     Copy,
     Play,
-    Archive
+    Archive,
+    Inbox,
+    Send
 } from 'lucide-react';
 import {
     Button,
@@ -243,7 +245,7 @@ export function FormsPage() {
                                         </button>
                                         {openDropdown === form.id && (
                                             <div
-                                                className="absolute right-0 top-full mt-1 w-40 bg-surface-800 border border-surface-700 rounded-lg shadow-xl z-10 animate-fade-in"
+                                                className="absolute right-0 top-full mt-1 w-48 bg-surface-800 border border-surface-700 rounded-lg shadow-xl z-10 animate-fade-in"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
                                                 <div className="p-1">
@@ -253,6 +255,20 @@ export function FormsPage() {
                                                     >
                                                         <Edit className="h-4 w-4" />
                                                         Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => navigate(`/forms/${form.id}/submissions`)}
+                                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-surface-300 hover:text-surface-100 hover:bg-surface-700/50 rounded-lg transition-colors whitespace-nowrap"
+                                                    >
+                                                        <Inbox className="h-4 w-4 shrink-0" />
+                                                        View Submissions
+                                                    </button>
+                                                    <button
+                                                        onClick={() => navigate(`/forms/${form.id}/fill`)}
+                                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-surface-300 hover:text-surface-100 hover:bg-surface-700/50 rounded-lg transition-colors whitespace-nowrap"
+                                                    >
+                                                        <Send className="h-4 w-4 shrink-0" />
+                                                        Fill Out
                                                     </button>
                                                     <button
                                                         onClick={() => handleDuplicate(form)}

@@ -93,6 +93,17 @@ export async function startProcess(
 }
 
 /**
+ * Execute a workflow (via the designer's /execute endpoint)
+ */
+export async function executeWorkflow(
+    workflowId: string,
+    input?: Record<string, unknown>
+): Promise<any> {
+    const response = await apiClient.post(`/workflows/${workflowId}/execute`, { input });
+    return response.data;
+}
+
+/**
  * List process instances
  */
 export async function listProcessInstances(processId: string): Promise<ProcessInstance[]> {

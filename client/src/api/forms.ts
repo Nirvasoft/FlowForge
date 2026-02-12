@@ -87,6 +87,40 @@ export async function deleteForm(id: string): Promise<void> {
 }
 
 /**
+ * Get form submissions
+ */
+export async function getFormSubmissions(
+    formId: string,
+    params: { page?: number; limit?: number; sortOrder?: 'asc' | 'desc' } = {}
+): Promise<{ data: any[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.set('page', params.page.toString());
+    if (params.limit) searchParams.set('limit', params.limit.toString());
+    if (params.sortOrder) searchParams.set('sortOrder', params.sortOrder);
+
+    const response = await apiClient.get(`/forms/${formId}/submissions?${searchParams.toString()}`);
+    const body = response.data;
+    return {
+        data: body.data || [],
+        pagination: body.pagination || { page: 1, limit: 20, total: 0, totalPages: 0 },
+    };
+}
+
+/**
+ * Delete a form submission
+ */
+export async function deleteFormSubmission(formId: string, submissionId: string): Promise<void> {
+    await del(`/forms/${formId}/submissions/${submissionId}`);
+}
+
+/**
+ * Submit form data
+ */
+export async function submitForm(formId: string, data: Record<string, unknown>): Promise<any> {
+    return post(`/forms/${formId}/submit`, data);
+}
+
+/**
  * Get available field types
  */
 export async function getFieldTypes(): Promise<Array<{ type: string; label: string; icon: string }>> {

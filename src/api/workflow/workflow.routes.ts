@@ -142,13 +142,62 @@ export async function workflowRoutes(fastify: FastifyInstance) {
   });
 
   // Update workflow
-  fastify.patch<{ Params: IdParams; Body: { name?: string; description?: string; settings?: any } }>('/:id', {
+  fastify.patch<{ Params: IdParams; Body: { name?: string; description?: string; settings?: any; nodes?: any[]; edges?: any[] } }>('/:id', {
     schema: { description: 'Update a workflow', tags: ['Workflows'] },
   }, async (request, reply) => {
-    const workflow = await service.updateWorkflow(request.params.id, request.body);
+    const { nodes: bodyNodes, edges: bodyEdges, ...metadataUpdates } = request.body;
+
+    // Try the in-memory service first
+    let workflow = await service.updateWorkflow(request.params.id, metadataUpdates);
+
+    // If not in memory, load from DB and populate in-memory store
     if (!workflow) {
-      return reply.status(404).send({ error: 'Workflow not found' });
+      const process = await prisma.process.findUnique({
+        where: { id: request.params.id },
+      });
+      if (!process) {
+        return reply.status(404).send({ error: 'Workflow not found' });
+      }
+
+      const definition = (process as any).definition as any || {};
+      const existingNodes = Array.isArray(definition.nodes) ? definition.nodes : [];
+      const existingEdges = Array.isArray(definition.edges) ? definition.edges : [];
+
+      // Build in-memory workflow object
+      workflow = {
+        id: process.id,
+        name: metadataUpdates.name || process.name,
+        slug: (metadataUpdates.name || process.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+        description: metadataUpdates.description || process.description || undefined,
+        version: process.version,
+        status: (process.status?.toLowerCase() as any) || 'draft',
+        nodes: bodyNodes || existingNodes,
+        edges: bodyEdges || existingEdges,
+        triggers: definition.triggers || [],
+        variables: definition.variables || [],
+        settings: metadataUpdates.settings || { timeout: 3600, retryPolicy: { enabled: true, maxAttempts: 3, backoffType: 'exponential', initialDelay: 1000, maxDelay: 60000 }, errorHandling: 'stop', logging: 'standard', concurrency: 10, priority: 'normal' },
+        createdAt: process.createdAt,
+        updatedAt: new Date(),
+        createdBy: process.createdBy || 'system',
+      } as any;
+
+      // Also update Prisma with the new definition
+      await prisma.process.update({
+        where: { id: request.params.id },
+        data: {
+          name: workflow!.name,
+          description: workflow!.description || null,
+          definition: { nodes: workflow!.nodes, edges: workflow!.edges, triggers: workflow!.triggers || [], variables: workflow!.variables || [] } as any,
+          updatedAt: new Date(),
+        },
+      });
+    } else if (bodyNodes || bodyEdges) {
+      // In-memory workflow exists, update its nodes/edges
+      if (bodyNodes) workflow.nodes = bodyNodes;
+      if (bodyEdges) workflow.edges = bodyEdges;
+      workflow.updatedAt = new Date();
     }
+
     return workflow;
   });
 

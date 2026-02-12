@@ -31,15 +31,23 @@ export function FormBuilderPage() {
                 setFormName(form.name || 'Untitled Form');
 
                 // Map form fields to FormBuilder's expected format
+                const rawOptions = (opts: any) => {
+                    if (!opts) return undefined;
+                    if (!Array.isArray(opts)) return undefined;
+                    // Normalize options: can be string[] or {label, value}[]
+                    return opts.map((o: any) =>
+                        typeof o === 'string' ? o : (o?.label ?? o?.value ?? String(o))
+                    );
+                };
                 const fields = (form.fields || []).map((f: any) => ({
                     id: f.id || Math.random().toString(36).substring(7),
                     type: f.type || 'text',
                     label: f.label || f.name || 'Field',
                     name: f.name || `field_${Date.now()}`,
                     required: f.required || false,
-                    placeholder: f.placeholder || '',
+                    placeholder: f.config?.placeholder || f.placeholder || '',
                     helpText: f.helpText || f.description || '',
-                    options: f.options || f.config?.options,
+                    options: rawOptions(f.options) || rawOptions(f.config?.options),
                     config: f.config,
                 }));
                 setInitialFields(fields);
