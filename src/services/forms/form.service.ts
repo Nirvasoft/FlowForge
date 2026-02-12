@@ -105,6 +105,7 @@ export class FormService {
           accountId: true,
           name: true,
           description: true,
+          fields: true,
           status: true,
           version: true,
           createdAt: true,
@@ -135,11 +136,20 @@ export class FormService {
 
   /**
    * Get form by ID
+   * Falls back to finding form across all accounts for dev purposes
    */
   async getFormById(accountId: string, formId: string): Promise<Form> {
-    const form = await prisma.form.findFirst({
+    // First try to find in the current account
+    let form = await prisma.form.findFirst({
       where: { id: formId, accountId },
     });
+
+    // Fallback: find form by ID regardless of account (for demo/seeded data)
+    if (!form) {
+      form = await prisma.form.findFirst({
+        where: { id: formId },
+      });
+    }
 
     if (!form) {
       throw new NotFoundError('Form not found');
@@ -488,6 +498,68 @@ export class FormService {
     });
 
     logger.info({ formId, submissionId: submission.id, accountId }, 'Form submitted');
+
+    // =========================================================================
+    // Trigger connected workflows
+    // =========================================================================
+    // Check if any workflows (Process records) have a form_submission trigger
+    // matching this form ID. If so, start the workflow execution automatically.
+    try {
+      const processes = await prisma.process.findMany({
+        where: {
+          status: 'ACTIVE',
+        },
+      });
+
+      for (const process of processes) {
+        const definition = (process as any).definition as any || {};
+        // Triggers can be stored in two places:
+        // 1. Top-level `triggers` column on the Process model (used by seed scripts)
+        // 2. Inside `definition.triggers` (used by the workflow designer)
+        // Prefer whichever has actual content
+        const topLevelTriggers = Array.isArray((process as any).triggers) ? (process as any).triggers : [];
+        const defTriggers = Array.isArray(definition.triggers) ? definition.triggers : [];
+        const triggers: any[] = topLevelTriggers.length > 0 ? topLevelTriggers : defTriggers;
+
+        const hasFormTrigger = triggers.some(
+          (t: any) => (t.type === 'form_submission' || t.type === 'form') && t.formId === formId
+        );
+
+        if (hasFormTrigger) {
+          logger.info(
+            { formId, processId: process.id, processName: process.name },
+            'Triggering workflow from form submission'
+          );
+
+          try {
+            // Dynamically import to avoid circular dependencies
+            const { workflowService } = await import('../workflow/workflow.service.js');
+            await workflowService.startExecution(
+              process.id,
+              data as Record<string, unknown>,
+              submittedBy || 'system',
+              'form'
+            );
+            logger.info(
+              { formId, processId: process.id },
+              'Workflow execution started from form submission'
+            );
+          } catch (execError) {
+            // Don't fail the submission if workflow trigger fails
+            logger.error(
+              { formId, processId: process.id, error: execError },
+              'Failed to trigger workflow from form submission'
+            );
+          }
+        }
+      }
+    } catch (triggerError) {
+      // Don't fail the submission if trigger lookup fails
+      logger.error(
+        { formId, error: triggerError },
+        'Failed to check for workflow triggers'
+      );
+    }
 
     return { submission, validation };
   }

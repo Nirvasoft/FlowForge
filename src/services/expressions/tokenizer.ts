@@ -9,10 +9,10 @@ export enum TokenType {
   STRING = 'STRING',
   BOOLEAN = 'BOOLEAN',
   NULL = 'NULL',
-  
+
   // Identifiers
   IDENTIFIER = 'IDENTIFIER',
-  
+
   // Operators
   PLUS = 'PLUS',
   MINUS = 'MINUS',
@@ -20,7 +20,7 @@ export enum TokenType {
   DIVIDE = 'DIVIDE',
   MODULO = 'MODULO',
   POWER = 'POWER',
-  
+
   // Comparison
   EQ = 'EQ',
   NEQ = 'NEQ',
@@ -30,15 +30,15 @@ export enum TokenType {
   GT = 'GT',
   LTE = 'LTE',
   GTE = 'GTE',
-  
+
   // Logical
   AND = 'AND',
   OR = 'OR',
   NOT = 'NOT',
-  
+
   // String
   CONCAT = 'CONCAT',
-  
+
   // Punctuation
   LPAREN = 'LPAREN',
   RPAREN = 'RPAREN',
@@ -50,7 +50,7 @@ export enum TokenType {
   DOT = 'DOT',
   COLON = 'COLON',
   QUESTION = 'QUESTION',
-  
+
   // Special
   EOF = 'EOF',
 }
@@ -318,6 +318,22 @@ export class Tokenizer {
     const char = this.current();
     const next = this.peek();
 
+    // Three-character operators (must be checked BEFORE two-character operators
+    // so that === is not incorrectly tokenized as == followed by =)
+    const threeChar = char + next + this.peek(2);
+    const threeCharOps: Record<string, TokenType> = {
+      '===': TokenType.STRICT_EQ,
+      '!==': TokenType.STRICT_NEQ,
+    };
+
+    if (threeCharOps[threeChar]) {
+      this.advance();
+      this.advance();
+      this.advance();
+      this.addToken(threeCharOps[threeChar], threeChar, start, startLine, startColumn);
+      return true;
+    }
+
     // Two-character operators
     const twoChar = char + next;
     const twoCharOps: Record<string, TokenType> = {
@@ -334,21 +350,6 @@ export class Tokenizer {
       this.advance();
       this.advance();
       this.addToken(twoCharOps[twoChar], twoChar, start, startLine, startColumn);
-      return true;
-    }
-
-    // Three-character operators
-    const threeChar = char + next + this.peek(2);
-    const threeCharOps: Record<string, TokenType> = {
-      '===': TokenType.STRICT_EQ,
-      '!==': TokenType.STRICT_NEQ,
-    };
-
-    if (threeCharOps[threeChar]) {
-      this.advance();
-      this.advance();
-      this.advance();
-      this.addToken(threeCharOps[threeChar], threeChar, start, startLine, startColumn);
       return true;
     }
 

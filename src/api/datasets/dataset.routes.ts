@@ -207,11 +207,33 @@ export async function datasetRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      // Try in-memory first
       const dataset = await service.getDataset(request.params.id);
-      if (!dataset) {
+      if (dataset) {
+        return dataset;
+      }
+
+      // Fallback: query Prisma for DB-stored/seeded datasets
+      const dbDataset = await prisma.dataset.findUnique({
+        where: { id: request.params.id },
+        include: {
+          _count: { select: { records: true } },
+        },
+      });
+
+      if (!dbDataset) {
         return reply.status(404).send({ error: 'Dataset not found' });
       }
-      return dataset;
+
+      return {
+        id: dbDataset.id,
+        name: dbDataset.name,
+        description: dbDataset.description,
+        schema: dbDataset.schema || {},
+        rowCount: (dbDataset as any)._count?.records || Number(dbDataset.rowCount) || 0,
+        createdAt: dbDataset.createdAt,
+        updatedAt: dbDataset.updatedAt,
+      };
     }
   );
 
@@ -360,12 +382,67 @@ export async function datasetRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      // Try in-memory first
       const result = await service.queryRecords(request.params.id, {
         page: request.query.page,
         pageSize: request.query.pageSize,
         search: request.query.search,
       });
-      return result;
+
+      // If in-memory has data, return it
+      if (result.data && result.data.length > 0) {
+        return result;
+      }
+
+      // Fallback: query Prisma for DB-stored records
+      const page = Number(request.query.page) || 1;
+      const pageSize = Number(request.query.pageSize) || 20;
+
+      // Verify dataset exists
+      const dbDataset = await prisma.dataset.findUnique({
+        where: { id: request.params.id },
+      });
+
+      if (!dbDataset) {
+        // Dataset doesn't exist at all — return empty result
+        return {
+          data: [],
+          total: 0,
+          page,
+          pageSize,
+          totalPages: 0,
+          hasMore: false,
+        };
+      }
+
+      const [dbRecords, total] = await Promise.all([
+        prisma.datasetRecord.findMany({
+          where: { datasetId: request.params.id },
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+          orderBy: { createdAt: 'desc' },
+        }),
+        prisma.datasetRecord.count({
+          where: { datasetId: request.params.id },
+        }),
+      ]);
+
+      return {
+        data: dbRecords.map((r: any) => ({
+          id: r.id,
+          datasetId: r.datasetId,
+          data: r.data || {},
+          createdAt: r.createdAt,
+          updatedAt: r.updatedAt,
+          createdBy: r.createdBy,
+          updatedBy: r.updatedBy,
+        })),
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+        hasMore: page * pageSize < total,
+      };
     }
   );
 

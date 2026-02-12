@@ -6,6 +6,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { formService } from '../../services/forms/form.service.js';
 import { authenticate, requirePermission } from '../../middleware/auth.js';
+import { prisma } from '../../utils/prisma.js';
 import type { FormStatus } from '@prisma/client';
 
 // ============================================================================
@@ -141,6 +142,36 @@ export async function formRoutes(fastify: FastifyInstance): Promise<void> {
       status: query.status as FormStatus | undefined,
       search: query.search,
     });
+
+    // If account has forms, return them
+    if (result.data && result.data.length > 0) {
+      reply.send({
+        success: true,
+        data: result.data,
+        pagination: result.pagination,
+      });
+      return;
+    }
+
+    // Fallback: also include forms from demo account for dev purposes
+    const demoAccount = await prisma.account.findUnique({ where: { slug: 'demo' } });
+    if (demoAccount && demoAccount.id !== request.accountId) {
+      const demoResult = await formService.listForms(demoAccount.id, {
+        page: query.page,
+        limit: query.limit,
+        sortBy: query.sortBy,
+        sortOrder: query.sortOrder,
+        status: query.status as FormStatus | undefined,
+        search: query.search,
+      });
+
+      reply.send({
+        success: true,
+        data: demoResult.data,
+        pagination: demoResult.pagination,
+      });
+      return;
+    }
 
     reply.send({
       success: true,

@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { userService } from '../services/user.service.js';
 import { authenticate, requirePermission } from '../middleware/auth.js';
+import { prisma } from '../utils/prisma.js';
 import type { UserStatus } from '@prisma/client';
 
 // Validation schemas
@@ -109,6 +110,44 @@ export async function userRoutes(fastify: FastifyInstance): Promise<void> {
       status: query.status as UserStatus | undefined,
       search: query.search,
     });
+
+    // If account has more than just the current user, return as-is
+    if (result.data && result.data.length > 1) {
+      reply.send({
+        success: true,
+        data: result.data,
+        pagination: result.pagination,
+      });
+      return;
+    }
+
+    // Fallback: also include users from demo account for dev purposes
+    const demoAccount = await prisma.account.findUnique({ where: { slug: 'demo' } });
+    if (demoAccount && demoAccount.id !== request.accountId) {
+      const demoResult = await userService.listUsers(demoAccount.id, {
+        page: query.page,
+        limit: query.limit,
+        sortBy: query.sortBy,
+        sortOrder: query.sortOrder,
+        status: query.status as UserStatus | undefined,
+        search: query.search,
+      });
+
+      // Merge current account user(s) with demo users
+      const allUsers = [...result.data, ...demoResult.data];
+      const total = result.pagination.total + demoResult.pagination.total;
+
+      reply.send({
+        success: true,
+        data: allUsers,
+        pagination: {
+          ...result.pagination,
+          total,
+          totalPages: Math.ceil(total / query.limit),
+        },
+      });
+      return;
+    }
 
     reply.send({
       success: true,

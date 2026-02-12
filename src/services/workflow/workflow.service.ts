@@ -18,6 +18,7 @@ import type {
   TaskStatus,
 } from '../../types/workflow';
 import { WorkflowEngine, workflowEngine } from './engine';
+import { prisma } from '../../utils/prisma.js';
 
 // ============================================================================
 // In-Memory Storage (Replace with Prisma in production)
@@ -508,7 +509,9 @@ export class WorkflowService {
     }
 
     // Allow manual/test executions even for draft workflows
-    if (workflow.status !== 'published' && triggerType !== 'manual') {
+    // Also allow 'active' status (from DB/Prisma ACTIVE enum) alongside 'published' (in-memory)
+    const wfStatus = workflow.status as string;
+    if (wfStatus !== 'published' && wfStatus !== 'active' && triggerType !== 'manual') {
       throw new Error('Can only execute published workflows. Use the designer to test draft workflows.');
     }
 
@@ -516,7 +519,16 @@ export class WorkflowService {
       workflow,
       input,
       triggeredBy,
-      triggerType
+      triggerType,
+      {
+        onTaskCreated: (task) => {
+          // Store the task in the in-memory tasks map so it appears in the tasks list
+          tasks.set(task.id, task);
+          console.log(
+            `📋 Human task created: [${task.type}] "${task.title}" (taskId=${task.id}, executionId=${task.executionId})`
+          );
+        },
+      }
     );
 
     executions.set(execution.id, execution);
@@ -557,18 +569,49 @@ export class WorkflowService {
   }
 
   async cancelExecution(id: string): Promise<WorkflowExecution | null> {
+    // Try in-memory first
     const execution = executions.get(id);
-    if (!execution) return null;
+    if (execution) {
+      if (execution.status === 'completed' || execution.status === 'failed') {
+        throw new Error('Cannot cancel completed or failed execution');
+      }
 
-    if (execution.status === 'completed' || execution.status === 'failed') {
+      execution.status = 'cancelled';
+      execution.completedAt = new Date();
+      executions.set(id, execution);
+
+      return execution;
+    }
+
+    // Fallback: update in Prisma
+    const dbInstance = await prisma.processInstance.findUnique({ where: { id } });
+    if (!dbInstance) return null;
+
+    if (dbInstance.status === 'COMPLETED' || dbInstance.status === 'FAILED') {
       throw new Error('Cannot cancel completed or failed execution');
     }
 
-    execution.status = 'cancelled';
-    execution.completedAt = new Date();
-    executions.set(id, execution);
+    const updated = await prisma.processInstance.update({
+      where: { id },
+      data: { status: 'CANCELLED', completedAt: new Date() },
+    });
 
-    return execution;
+    // Also cancel any pending tasks for this instance
+    await prisma.taskInstance.updateMany({
+      where: { instanceId: id, status: { in: ['PENDING', 'CLAIMED'] } },
+      data: { status: 'CANCELLED' },
+    });
+
+    return {
+      id: updated.id,
+      workflowId: updated.processId,
+      status: 'cancelled',
+      variables: (updated.variables as Record<string, unknown>) || {},
+      completedNodes: [],
+      currentNodes: (updated.currentNodes as string[]) || [],
+      startedAt: updated.startedAt,
+      completedAt: updated.completedAt || undefined,
+    } as unknown as WorkflowExecution;
   }
 
   async pauseExecution(id: string): Promise<WorkflowExecution | null> {
@@ -595,7 +638,14 @@ export class WorkflowService {
     const workflow = workflows.get(execution.workflowId);
     if (!workflow) return null;
 
-    const resumed = await this.engine.resumeExecution(execution, workflow, resumeData);
+    const resumed = await this.engine.resumeExecution(execution, workflow, resumeData, {
+      onTaskCreated: (task) => {
+        tasks.set(task.id, task);
+        console.log(
+          `📋 Human task created (on resume): [${task.type}] "${task.title}" (taskId=${task.id})`
+        );
+      },
+    });
     executions.set(id, resumed);
 
     return resumed;

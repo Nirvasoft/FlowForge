@@ -399,7 +399,142 @@ async function seedLeaveRequestFlow() {
             publishedAt: new Date(),
             createdBy: adminUser.id,
         },
-        update: {},
+        update: {
+            definition: {
+                nodes: [
+                    {
+                        id: 'start-1',
+                        type: 'start',
+                        name: 'Leave Request Initiated',
+                        description: 'Employee submits a leave request form',
+                        position: { x: 100, y: 300 },
+                        config: { trigger: 'form_submission', formId: leaveRequestForm.id },
+                    },
+                    {
+                        id: 'form-1',
+                        type: 'form',
+                        name: 'Submit Leave Form',
+                        description: 'Employee fills in the leave request details',
+                        position: { x: 350, y: 300 },
+                        config: {
+                            formId: leaveRequestForm.id,
+                            assignTo: 'initiator',
+                        },
+                    },
+                    {
+                        id: 'decision-1',
+                        type: 'decision',
+                        name: 'Auto-Approve Check',
+                        description: 'Check if leave is ≤ 1 day for auto-approval',
+                        position: { x: 600, y: 300 },
+                        config: {},
+                        condition: 'variables.totalDays <= 1',
+                    },
+                    {
+                        id: 'approval-1',
+                        type: 'approval',
+                        name: 'Manager Approval',
+                        description: 'Direct manager reviews and approves/rejects the leave request',
+                        position: { x: 850, y: 200 },
+                        config: {
+                            assignTo: 'manager',
+                            approvalType: 'single',
+                            timeoutDays: 3,
+                            escalateTo: 'hr_manager',
+                            formFields: ['leaveType', 'startDate', 'endDate', 'totalDays', 'reason'],
+                        },
+                    },
+                    {
+                        id: 'decision-2',
+                        type: 'decision',
+                        name: 'Manager Decision',
+                        description: 'Check manager approval decision',
+                        position: { x: 1100, y: 200 },
+                        config: {},
+                        condition: 'outcome === "approved"',
+                    },
+                    {
+                        id: 'approval-2',
+                        type: 'approval',
+                        name: 'HR Review',
+                        description: 'HR reviews approved leave requests (for leaves > 3 days)',
+                        position: { x: 1350, y: 100 },
+                        config: {
+                            assignTo: 'role:hr_manager',
+                            approvalType: 'single',
+                            timeoutDays: 2,
+                            condition: 'variables.totalDays > 3',
+                        },
+                    },
+                    {
+                        id: 'email-1',
+                        type: 'email',
+                        name: 'Send Approval Notification',
+                        description: 'Notify employee that leave is approved',
+                        position: { x: 1600, y: 200 },
+                        config: {
+                            to: '{{initiator.email}}',
+                            subject: 'Leave Request Approved',
+                            template: 'leave_approved',
+                        },
+                    },
+                    {
+                        id: 'email-2',
+                        type: 'email',
+                        name: 'Send Rejection Notification',
+                        description: 'Notify employee that leave is rejected',
+                        position: { x: 1100, y: 450 },
+                        config: {
+                            to: '{{initiator.email}}',
+                            subject: 'Leave Request Rejected',
+                            template: 'leave_rejected',
+                        },
+                    },
+                    {
+                        id: 'action-1',
+                        type: 'action',
+                        name: 'Update Leave Balance',
+                        description: 'Deduct leave days from employee balance',
+                        position: { x: 1850, y: 200 },
+                        config: {
+                            action: 'update_dataset',
+                            datasetName: 'Leave Records',
+                            operation: 'insert',
+                        },
+                    },
+                    {
+                        id: 'end-1',
+                        type: 'end',
+                        name: 'Leave Approved',
+                        description: 'Leave request process completed (approved)',
+                        position: { x: 2100, y: 200 },
+                        config: {},
+                    },
+                    {
+                        id: 'end-2',
+                        type: 'end',
+                        name: 'Leave Rejected',
+                        description: 'Leave request process completed (rejected)',
+                        position: { x: 1350, y: 450 },
+                        config: {},
+                    },
+                ],
+                edges: [
+                    { id: 'e1', source: 'start-1', target: 'form-1', label: '' },
+                    { id: 'e2', source: 'form-1', target: 'decision-1', label: 'Form Submitted' },
+                    { id: 'e3', source: 'decision-1', target: 'approval-1', label: '> 1 day', condition: 'variables.totalDays > 1' },
+                    { id: 'e4', source: 'decision-1', target: 'email-1', label: '≤ 1 day (Auto-Approve)', condition: 'variables.totalDays <= 1' },
+                    { id: 'e5', source: 'approval-1', target: 'decision-2', label: 'Decision Made' },
+                    { id: 'e6', source: 'decision-2', target: 'approval-2', label: 'Approved & > 3 days', condition: 'outcome === "approved" && variables.totalDays > 3' },
+                    { id: 'e7', source: 'decision-2', target: 'email-1', label: 'Approved & ≤ 3 days', condition: 'outcome === "approved" && variables.totalDays <= 3' },
+                    { id: 'e8', source: 'decision-2', target: 'email-2', label: 'Rejected', condition: 'outcome === "rejected"' },
+                    { id: 'e9', source: 'approval-2', target: 'email-1', label: 'HR Approved' },
+                    { id: 'e10', source: 'email-1', target: 'action-1', label: '' },
+                    { id: 'e11', source: 'action-1', target: 'end-1', label: '' },
+                    { id: 'e12', source: 'email-2', target: 'end-2', label: '' },
+                ],
+            },
+        },
     });
 
     console.log(`✅ Created process: ${leaveProcess.name} (${leaveProcess.id})\n`);
@@ -441,7 +576,12 @@ async function seedLeaveRequestFlow() {
 
     // ==========================================================================
     // 6. Create Sample Leave Records (Dataset Records)
+    //    Clean up first to avoid duplicates on re-seed
     // ==========================================================================
+    await prisma.datasetRecord.deleteMany({
+        where: { datasetId: leaveDataset.id },
+    });
+
     const sampleLeaveRecords = [
         {
             employee: 'John Doe', department: 'Engineering', leave_type: 'Annual Leave',
@@ -514,8 +654,12 @@ async function seedLeaveRequestFlow() {
     console.log(`✅ Created ${recordsCreated} leave records\n`);
 
     // ==========================================================================
-    // 7. Create Form Submissions
+    // 7. Create Form Submissions (clean up first to avoid duplicates on re-seed)
     // ==========================================================================
+    await prisma.formSubmission.deleteMany({
+        where: { formId: leaveRequestForm.id },
+    });
+
     const formSubmissions = [
         {
             employeeName: 'John Doe', department: 'engineering', leaveType: 'annual',
@@ -557,7 +701,19 @@ async function seedLeaveRequestFlow() {
 
     // ==========================================================================
     // 8. Create Process Instances (workflow runs at different stages)
+    //    Clean up first to avoid duplicates on re-seed
     // ==========================================================================
+    // Delete in order: node executions → task instances → process instances (FK constraints)
+    await prisma.nodeExecution.deleteMany({
+        where: { instance: { processId: leaveProcess.id } },
+    });
+    await prisma.taskInstance.deleteMany({
+        where: { instance: { processId: leaveProcess.id } },
+    });
+    await prisma.processInstance.deleteMany({
+        where: { processId: leaveProcess.id },
+    });
+
     const allUsers = [adminUser, ...users];
     const processInstances = [];
 

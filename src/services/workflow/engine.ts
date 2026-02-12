@@ -41,6 +41,11 @@ export interface ExecutionContext {
   variables: Record<string, unknown>;
   nodeStates: Map<string, NodeExecutionState>;
   expressionService: ExpressionService;
+  onTaskCreated?: (task: any) => void;
+}
+
+export interface EngineCallbacks {
+  onTaskCreated?: (task: any) => void;
 }
 
 // ============================================================================
@@ -124,7 +129,8 @@ export class WorkflowEngine {
     workflow: Workflow,
     input: Record<string, unknown> = {},
     triggeredBy: string = 'system',
-    triggerType: string = 'manual'
+    triggerType: string = 'manual',
+    callbacks?: EngineCallbacks
   ): Promise<WorkflowExecution> {
     const execution: WorkflowExecution = {
       id: randomUUID(),
@@ -162,7 +168,7 @@ export class WorkflowEngine {
     }
 
     // Initialize context
-    const context = this.createContext(execution, workflow);
+    const context = this.createContext(execution, workflow, callbacks);
 
     // Log start
     this.log(context, 'info', `Starting workflow execution: ${workflow.name}`);
@@ -180,7 +186,8 @@ export class WorkflowEngine {
   async resumeExecution(
     execution: WorkflowExecution,
     workflow: Workflow,
-    resumeData?: Record<string, unknown>
+    resumeData?: Record<string, unknown>,
+    callbacks?: EngineCallbacks
   ): Promise<WorkflowExecution> {
     if (execution.status !== 'paused' && execution.status !== 'waiting') {
       throw new Error(`Cannot resume execution in status: ${execution.status}`);
@@ -192,11 +199,51 @@ export class WorkflowEngine {
       Object.assign(execution.variables, resumeData);
     }
 
-    const context = this.createContext(execution, workflow);
+    const context = this.createContext(execution, workflow, callbacks);
     this.log(context, 'info', 'Resuming workflow execution');
 
-    // Continue from current nodes
-    await this.executeNodes(context, execution.currentNodes);
+    // When resuming from a waiting node (e.g. approval), don't re-execute that node.
+    // Instead, mark it as completed and continue to the next nodes.
+    const waitingNodeIds = [...execution.currentNodes];
+    const nextNodesAfterWait: string[] = [];
+
+    for (const nodeId of waitingNodeIds) {
+      const node = workflow.nodes.find(n => n.id === nodeId);
+      if (!node) continue;
+
+      // Mark as completed
+      execution.completedNodes.push(nodeId);
+      execution.currentNodes = execution.currentNodes.filter(id => id !== nodeId);
+
+      // Update node state
+      this.setNodeState(context, nodeId, 'completed');
+
+      // Add the outcome to variables (for decision nodes downstream)
+      if (resumeData) {
+        // Extract outcome for convenience
+        const outcomeKey = `_task_${nodeId}_outcome`;
+        if (resumeData[outcomeKey]) {
+          context.variables['outcome'] = resumeData[outcomeKey];
+          execution.variables['outcome'] = resumeData[outcomeKey];
+        }
+      }
+
+      // Get next nodes
+      const nodeNextNodes = this.getNextNodes(workflow, nodeId, context.variables);
+      nextNodesAfterWait.push(...nodeNextNodes);
+    }
+
+    // Continue executing from the next nodes
+    if (nextNodesAfterWait.length > 0) {
+      execution.currentNodes.push(...nextNodesAfterWait);
+      await this.executeNodes(context, nextNodesAfterWait);
+    } else if (execution.currentNodes.length === 0) {
+      execution.status = 'completed';
+      execution.completedAt = new Date();
+      execution.output = context.variables;
+      execution.metrics.totalDuration =
+        execution.completedAt.getTime() - execution.startedAt.getTime();
+    }
 
     return execution;
   }
@@ -386,7 +433,8 @@ export class WorkflowEngine {
    */
   private createContext(
     execution: WorkflowExecution,
-    workflow: Workflow
+    workflow: Workflow,
+    callbacks?: EngineCallbacks
   ): ExecutionContext {
     return {
       execution,
@@ -394,6 +442,7 @@ export class WorkflowEngine {
       variables: execution.variables,
       nodeStates: new Map(),
       expressionService: this.expressionService,
+      onTaskCreated: callbacks?.onTaskCreated,
     };
   }
 
@@ -401,7 +450,12 @@ export class WorkflowEngine {
    * Evaluate an expression
    */
   evaluateExpression(context: ExecutionContext, expression: string): unknown {
-    this.expressionService.setFields(context.variables as Record<string, any>);
+    // Make variables accessible both directly (e.g. `totalDays`) and nested (e.g. `variables.totalDays`)
+    const fields = {
+      ...context.variables,
+      variables: context.variables,
+    } as Record<string, any>;
+    this.expressionService.setFields(fields);
     const result = this.expressionService.evaluate(expression);
     return result.success ? result.value : null;
   }
@@ -511,6 +565,31 @@ class DecisionNodeExecutor implements NodeExecutor {
       e.sourceHandle === 'false' || e.sourceHandle === 'no' || isFalseLabel(e.label)
     );
 
+    // Check if edges have their own conditions (multi-way switch pattern)
+    // If no labeled true/false edges are found, evaluate each edge's condition
+    const hasConditionalEdges = edges.some(e => e.condition);
+    if (hasConditionalEdges && !trueEdge && !falseEdge) {
+      // Multi-way routing: evaluate each edge's condition against current variables
+      const nextNodes: string[] = [];
+      for (const edge of edges) {
+        if (edge.condition) {
+          const edgeResult = engine.evaluateExpression(context, edge.condition);
+          if (edgeResult) {
+            nextNodes.push(edge.target);
+          }
+        } else {
+          // Unconditional edge — always include
+          nextNodes.push(edge.target);
+        }
+      }
+      return {
+        status: 'completed',
+        output: { _decision: result },
+        nextNodes,
+      };
+    }
+
+    // Standard true/false binary routing
     // If no labeled edges match, fall back to: true → first edge, false → second edge
     let nextNodes: string[];
     if (result) {
@@ -741,7 +820,7 @@ class ExpressionNodeExecutor implements NodeExecutor {
 
 class ApprovalNodeExecutor implements NodeExecutor {
   async execute(node: WorkflowNode, context: ExecutionContext): Promise<NodeExecutionResult> {
-    const config = node.config as ApprovalNodeConfig;
+    const config = node.config as any; // Seed data uses different field names than ApprovalNodeConfig type
     const taskId = randomUUID();
 
     context.execution.metrics.pendingTasks++;
@@ -763,11 +842,46 @@ class ApprovalNodeExecutor implements NodeExecutor {
       };
     }
 
-    // For production triggers, pause and wait for human approval
+    // For form-triggered and production workflows: create a real human task
+    // and pause execution until it is claimed & completed.
+    // Always include 'user-1' so the demo user can claim tasks (route handlers hardcode userId='user-1')
+    const configAssignees = config?.assignTo ? [config.assignTo] : [];
+    const assignees = ['user-1', ...configAssignees.filter((a: string) => a !== 'user-1')];
+    const taskTitle = node.name || 'Approval Required';
+    const taskDescription = node.description || `Please review and approve/reject this request.`;
+
+    // Create the task via the callback (connects to the in-memory task store)
+    if (context.onTaskCreated) {
+      context.onTaskCreated({
+        id: taskId,
+        executionId: context.execution.id,
+        nodeId: node.id,
+        workflowId: context.workflow.id,
+        type: 'approval',
+        status: 'pending',
+        assignees,
+        title: taskTitle,
+        description: taskDescription,
+        formData: { ...context.variables },
+        createdAt: new Date(),
+        dueDate: config?.timeoutDays
+          ? new Date(Date.now() + config.timeoutDays * 86400000)
+          : undefined,
+        escalationLevel: 0,
+        history: [{ timestamp: new Date(), action: 'created' }],
+      });
+    }
+
+    // Pause and wait for human approval
     return {
       status: 'waiting',
       waitForTask: taskId,
-      output: { _taskId: taskId, _taskType: 'approval' },
+      output: {
+        _taskId: taskId,
+        _taskType: 'approval',
+        _taskTitle: taskTitle,
+        _assignees: assignees,
+      },
     };
   }
 }
@@ -813,13 +927,16 @@ class FormNodeExecutor implements NodeExecutor {
 
     context.execution.metrics.pendingTasks++;
 
-    // In a full production system, this would persist the task to the database
-    // and notify the assignees. For now, we simulate by auto-completing
-    // if triggered from the designer (manual trigger).
-    if (context.execution.triggerType === 'manual') {
-      // Auto-complete form tasks during manual/test runs
+    // Auto-complete form tasks during manual/test runs and form-triggered executions.
+    // When triggered by a form submission, the form data is already in the execution input.
+    if (context.execution.triggerType === 'manual' || context.execution.triggerType === 'form') {
       context.execution.metrics.pendingTasks--;
       context.execution.metrics.completedTasks++;
+
+      // When triggered by form submission, the actual form data is already in context.variables
+      const formData = context.execution.triggerType === 'form'
+        ? { ...context.execution.input }
+        : {};
 
       return {
         status: 'completed',
@@ -828,7 +945,10 @@ class FormNodeExecutor implements NodeExecutor {
           _taskType: 'form',
           _formId: config?.formId || null,
           _autoCompleted: true,
-          _message: 'Form task auto-completed (manual test run)',
+          _message: context.execution.triggerType === 'form'
+            ? 'Form task completed with submitted data'
+            : 'Form task auto-completed (manual test run)',
+          ...formData,
         },
       };
     }
@@ -882,18 +1002,50 @@ class EmailNodeExecutor implements NodeExecutor {
     subject = resolveNested(subject);
     body = resolveNested(body);
 
-    // In production, integrate with an actual email service (SendGrid, SES, etc.)
-    // For now, log the simulated send
-    return {
-      status: 'completed',
-      output: {
-        _emailSent: true,
-        _emailTo: to,
-        _emailSubject: subject,
-        _emailTemplate: config?.templateId || null,
-        _message: `Email simulated to: ${to}`,
-      },
-    };
+    // If the recipient is still an unresolved template, use a fallback
+    if (to.includes('{{') || to === 'unknown') {
+      to = 'admin@demo.com';
+    }
+
+    // Send real email via the email service
+    try {
+      const { emailService } = await import('../email/email.service.js');
+      const result = await emailService.sendWorkflowNotification({
+        to,
+        subject,
+        workflowName: context.workflow.name,
+        taskName: node.name,
+        body,
+        variables: context.variables,
+      });
+
+      return {
+        status: 'completed',
+        output: {
+          _emailSent: true,
+          _emailTo: to,
+          _emailSubject: subject,
+          _emailMessageId: result.messageId,
+          _emailPreviewUrl: result.previewUrl,
+          _emailTemplate: config?.templateId || null,
+          _message: result.previewUrl
+            ? `Email sent! Preview: ${result.previewUrl}`
+            : `Email sent to: ${to}`,
+        },
+      };
+    } catch (emailError: any) {
+      // Don't fail the workflow if email fails — log and continue
+      return {
+        status: 'completed',
+        output: {
+          _emailSent: false,
+          _emailTo: to,
+          _emailSubject: subject,
+          _emailError: emailError?.message || 'Email send failed',
+          _message: `Email send failed: ${emailError?.message}`,
+        },
+      };
+    }
   }
 }
 

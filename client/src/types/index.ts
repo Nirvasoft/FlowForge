@@ -81,15 +81,37 @@ export interface FormField {
 }
 
 // Dataset types
+export interface DatasetColumn {
+    name: string;
+    slug: string;
+    type: string;
+    required?: boolean;
+    unique?: boolean;
+    hidden?: boolean;
+    settings?: Record<string, unknown>;
+    defaultValue?: unknown;
+}
+
 export interface Dataset {
     id: string;
     accountId: string;
     name: string;
     description?: string;
-    schema: Record<string, unknown>;
+    schema: Record<string, unknown> | DatasetColumn[];
+    columns?: DatasetColumn[];
     rowCount: number;
     createdAt: string;
     updatedAt: string;
+}
+
+export interface DatasetRecord {
+    id: string;
+    datasetId: string;
+    data: Record<string, unknown>;
+    createdAt: string;
+    updatedAt: string;
+    createdBy?: string;
+    updatedBy?: string;
 }
 
 // Workflow types

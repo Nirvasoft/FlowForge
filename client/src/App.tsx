@@ -5,7 +5,7 @@ import { LoginPage, RegisterPage } from './pages/auth';
 import { DashboardPage } from './pages/dashboard';
 import { UsersPage } from './pages/users';
 import { FormsPage, FormBuilderPage, FormSubmissionsPage, FormFillPage } from './pages/forms';
-import { DatasetsPage } from './pages/datasets';
+import { DatasetsPage, DatasetDetailPage } from './pages/datasets';
 import { WorkflowsPage } from './pages/workflows';
 import { WorkflowDesigner } from './pages/workflows/WorkflowDesigner';
 import { AppsPage, AppBuilder } from './pages/apps';
@@ -39,6 +39,7 @@ function App() {
             <Route path="/forms/:id/submissions" element={<FormSubmissionsPage />} />
             <Route path="/forms/:id/fill" element={<FormFillPage />} />
             <Route path="/datasets" element={<DatasetsPage />} />
+            <Route path="/datasets/:id" element={<DatasetDetailPage />} />
             <Route path="/workflows" element={<WorkflowsPage />} />
             <Route path="/apps" element={<AppsPage />} />
             <Route path="/decision-tables" element={<DecisionTablesPage />} />

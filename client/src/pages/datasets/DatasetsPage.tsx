@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Plus,
     Search,
@@ -8,7 +9,10 @@ import {
     Trash2,
     Download,
     Upload,
-    Table2
+    Table2,
+    ArrowRight,
+    Calendar,
+    Rows3,
 } from 'lucide-react';
 import {
     Button,
@@ -21,9 +25,23 @@ import {
 } from '../../components/ui';
 import { DatasetImportModal, DatasetExportModal } from './DatasetImportExport';
 import { listDatasets, createDataset, updateDataset, deleteDataset, exportDataset } from '../../api/datasets';
-import type { Dataset } from '../../types';
+import type { Dataset, DatasetColumn } from '../../types';
+
+// Helper to extract column names from schema
+function getColumnNames(schema: Record<string, unknown> | DatasetColumn[]): string[] {
+    if (Array.isArray(schema)) {
+        return schema.map((col: any) => col.name || col.label || col.slug || 'Unknown');
+    }
+    return Object.keys(schema);
+}
+
+function getColumnCount(schema: Record<string, unknown> | DatasetColumn[]): number {
+    if (Array.isArray(schema)) return schema.length;
+    return Object.keys(schema).length;
+}
 
 export function DatasetsPage() {
+    const navigate = useNavigate();
     const [datasets, setDatasets] = useState<Dataset[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(true);
@@ -31,7 +49,6 @@ export function DatasetsPage() {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingDataset, setEditingDataset] = useState<Dataset | null>(null);
     const [deletingDataset, setDeletingDataset] = useState<Dataset | null>(null);
-    const [viewingDataset, setViewingDataset] = useState<Dataset | null>(null);
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
     // Import/Export states
@@ -106,7 +123,6 @@ export function DatasetsPage() {
     }, [deletingDataset]);
 
     const handleImport = useCallback(async (data: Record<string, unknown>[], _columnMapping: Record<string, string>) => {
-        // TODO: Implement import API when available
         if (importingDataset) {
             setDatasets(prev => prev.map(d =>
                 d.id === importingDataset.id
@@ -124,6 +140,7 @@ export function DatasetsPage() {
     }, [exportingDataset]);
 
     const formatRowCount = (count: number) => {
+        if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
         if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
         return count.toString();
     };
@@ -160,142 +177,149 @@ export function DatasetsPage() {
                 </CardContent>
             </Card>
 
-            {/* Datasets table */}
-            <Card>
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead>
-                            <tr className="border-b border-surface-700/50">
-                                <th className="px-6 py-3 text-left text-xs font-medium text-surface-400 uppercase tracking-wider">
-                                    Dataset
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-surface-400 uppercase tracking-wider">
-                                    Columns
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-surface-400 uppercase tracking-wider">
-                                    Records
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-surface-400 uppercase tracking-wider">
-                                    Last Updated
-                                </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-surface-400 uppercase tracking-wider">
-                                    Actions
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-surface-700/50">
-                            {isLoading ? (
-                                <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center text-surface-400">
-                                        Loading datasets...
-                                    </td>
-                                </tr>
-                            ) : filteredDatasets.length === 0 ? (
-                                <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center">
-                                        <div className="flex flex-col items-center">
-                                            <Database className="h-8 w-8 text-surface-500 mb-2" />
-                                            <p className="text-surface-400">No datasets found</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredDatasets.map((dataset) => (
-                                    <tr
-                                        key={dataset.id}
-                                        className="hover:bg-surface-800/30 transition-colors cursor-pointer"
-                                        onClick={() => setViewingDataset(dataset)}
-                                    >
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
-                                                    <Table2 className="h-5 w-5" />
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium text-surface-100">{dataset.name}</p>
-                                                    <p className="text-sm text-surface-400 line-clamp-1">
-                                                        {dataset.description || 'No description'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-wrap gap-1">
-                                                {Object.keys(dataset.schema || {}).slice(0, 3).map((col) => (
-                                                    <Badge key={col} variant="info">{col}</Badge>
-                                                ))}
-                                                {Object.keys(dataset.schema || {}).length > 3 && (
-                                                    <Badge variant="info">
-                                                        +{Object.keys(dataset.schema || {}).length - 3}
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className="text-surface-200 font-medium">
-                                                {formatRowCount(dataset.rowCount)}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-surface-400 text-sm">
-                                            {new Date(dataset.updatedAt).toLocaleDateString()}
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="relative" onClick={(e) => e.stopPropagation()}>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setOpenDropdown(openDropdown === dataset.id ? null : dataset.id);
-                                                    }}
-                                                    className="p-2 rounded-lg text-surface-400 hover:text-surface-200 hover:bg-surface-800/50 transition-colors"
-                                                >
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </button>
-                                                {openDropdown === dataset.id && (
-                                                    <div className="absolute right-0 top-full mt-1 w-40 bg-surface-800 border border-surface-700 rounded-lg shadow-xl z-10 animate-fade-in">
-                                                        <div className="p-1">
-                                                            <button
-                                                                onClick={() => {
-                                                                    setEditingDataset(dataset);
-                                                                    setOpenDropdown(null);
-                                                                }}
-                                                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-surface-300 hover:text-surface-100 hover:bg-surface-700/50 rounded-lg transition-colors"
-                                                            >
-                                                                <Edit className="h-4 w-4" />
-                                                                Edit
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setExportingDataset(dataset);
-                                                                    setOpenDropdown(null);
-                                                                }}
-                                                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-surface-300 hover:text-surface-100 hover:bg-surface-700/50 rounded-lg transition-colors"
-                                                            >
-                                                                <Download className="h-4 w-4" />
-                                                                Export
-                                                            </button>
-                                                            <hr className="my-1 border-surface-700" />
-                                                            <button
-                                                                onClick={() => {
-                                                                    setDeletingDataset(dataset);
-                                                                    setOpenDropdown(null);
-                                                                }}
-                                                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                                Delete
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+            {/* Datasets grid (cards) */}
+            {isLoading ? (
+                <div className="flex items-center justify-center py-16">
+                    <div className="flex items-center gap-3 text-surface-400">
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary-500 border-t-transparent" />
+                        Loading datasets...
+                    </div>
                 </div>
-            </Card>
+            ) : filteredDatasets.length === 0 ? (
+                <Card>
+                    <CardContent className="py-16">
+                        <div className="flex flex-col items-center gap-3">
+                            <Database className="h-12 w-12 text-surface-600" />
+                            <div className="text-center">
+                                <p className="text-surface-300 font-medium">No datasets found</p>
+                                <p className="text-sm text-surface-500 mt-1">
+                                    {searchQuery
+                                        ? 'Try a different search query'
+                                        : 'Create your first dataset to start managing data'}
+                                </p>
+                            </div>
+                            {!searchQuery && (
+                                <Button onClick={() => setIsCreateModalOpen(true)} className="mt-2">
+                                    <Plus className="h-4 w-4" />
+                                    Create Dataset
+                                </Button>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredDatasets.map((dataset) => {
+                        const colNames = getColumnNames(dataset.schema);
+                        const colCount = getColumnCount(dataset.schema);
+
+                        return (
+                            <Card
+                                key={dataset.id}
+                                className="group cursor-pointer hover:border-primary-500/30 transition-all duration-200"
+                                onClick={() => navigate(`/datasets/${dataset.id}`)}
+                            >
+                                <CardContent className="p-5">
+                                    {/* Header */}
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20 transition-colors">
+                                                <Table2 className="h-5 w-5" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-semibold text-surface-100 truncate group-hover:text-primary-400 transition-colors">
+                                                    {dataset.name}
+                                                </h3>
+                                            </div>
+                                        </div>
+                                        <div className="relative" onClick={(e) => e.stopPropagation()}>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setOpenDropdown(openDropdown === dataset.id ? null : dataset.id);
+                                                }}
+                                                className="p-1.5 rounded-lg text-surface-500 hover:text-surface-200 hover:bg-surface-800/50 transition-colors opacity-0 group-hover:opacity-100"
+                                            >
+                                                <MoreHorizontal className="h-4 w-4" />
+                                            </button>
+                                            {openDropdown === dataset.id && (
+                                                <div className="absolute right-0 top-full mt-1 w-40 bg-surface-800 border border-surface-700 rounded-lg shadow-xl z-10 animate-fade-in">
+                                                    <div className="p-1">
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingDataset(dataset);
+                                                                setOpenDropdown(null);
+                                                            }}
+                                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-surface-300 hover:text-surface-100 hover:bg-surface-700/50 rounded-lg transition-colors"
+                                                        >
+                                                            <Edit className="h-4 w-4" />
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setExportingDataset(dataset);
+                                                                setOpenDropdown(null);
+                                                            }}
+                                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-surface-300 hover:text-surface-100 hover:bg-surface-700/50 rounded-lg transition-colors"
+                                                        >
+                                                            <Download className="h-4 w-4" />
+                                                            Export
+                                                        </button>
+                                                        <hr className="my-1 border-surface-700" />
+                                                        <button
+                                                            onClick={() => {
+                                                                setDeletingDataset(dataset);
+                                                                setOpenDropdown(null);
+                                                            }}
+                                                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Description */}
+                                    <p className="text-sm text-surface-400 line-clamp-2 mb-4 min-h-[40px]">
+                                        {dataset.description || 'No description'}
+                                    </p>
+
+                                    {/* Columns preview */}
+                                    <div className="flex flex-wrap gap-1.5 mb-4">
+                                        {colNames.slice(0, 4).map((col) => (
+                                            <Badge key={col} variant="info">{col}</Badge>
+                                        ))}
+                                        {colCount > 4 && (
+                                            <Badge variant="info">+{colCount - 4} more</Badge>
+                                        )}
+                                        {colCount === 0 && (
+                                            <span className="text-xs text-surface-500">No columns defined</span>
+                                        )}
+                                    </div>
+
+                                    {/* Footer stats */}
+                                    <div className="flex items-center justify-between pt-3 border-t border-surface-700/50">
+                                        <div className="flex items-center gap-4 text-xs text-surface-400">
+                                            <span className="flex items-center gap-1.5">
+                                                <Rows3 className="h-3.5 w-3.5" />
+                                                {formatRowCount(dataset.rowCount)} records
+                                            </span>
+                                            <span className="flex items-center gap-1.5">
+                                                <Calendar className="h-3.5 w-3.5" />
+                                                {new Date(dataset.updatedAt).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                        <ArrowRight className="h-4 w-4 text-surface-600 group-hover:text-primary-400 transition-colors transform group-hover:translate-x-1 duration-200" />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
+                </div>
+            )}
 
             {/* Create Dataset Modal */}
             <DatasetModal
@@ -330,58 +354,12 @@ export function DatasetsPage() {
                 </ModalFooter>
             </Modal>
 
-            {/* View Dataset Modal (Simple Preview) */}
-            <Modal
-                isOpen={!!viewingDataset}
-                onClose={() => setViewingDataset(null)}
-                title={viewingDataset?.name || 'Dataset'}
-                description={viewingDataset?.description}
-                size="lg"
-            >
-                {viewingDataset && (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                                <span className="text-surface-400">Records:</span>
-                                <span className="ml-2 text-surface-100">{viewingDataset.rowCount}</span>
-                            </div>
-                            <div>
-                                <span className="text-surface-400">Columns:</span>
-                                <span className="ml-2 text-surface-100">{Object.keys(viewingDataset.schema).length}</span>
-                            </div>
-                        </div>
-                        <div>
-                            <h4 className="text-sm font-medium text-surface-200 mb-2">Schema</h4>
-                            <div className="bg-surface-800/50 rounded-lg p-3 space-y-1">
-                                {Object.entries(viewingDataset.schema).map(([name, type]) => (
-                                    <div key={name} className="flex justify-between text-sm">
-                                        <span className="text-surface-300">{name}</span>
-                                        <Badge variant="info">{String(type)}</Badge>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <ModalFooter>
-                            <Button variant="ghost" onClick={() => setViewingDataset(null)}>
-                                Close
-                            </Button>
-                            <Button onClick={() => {
-                                setEditingDataset(viewingDataset);
-                                setViewingDataset(null);
-                            }}>
-                                Edit Dataset
-                            </Button>
-                        </ModalFooter>
-                    </div>
-                )}
-            </Modal>
-
             {/* Import Modal */}
             <DatasetImportModal
                 isOpen={!!importingDataset}
                 onClose={() => setImportingDataset(null)}
                 datasetName={importingDataset?.name || ''}
-                existingColumns={importingDataset ? Object.keys(importingDataset.schema) : []}
+                existingColumns={importingDataset ? getColumnNames(importingDataset.schema) : []}
                 onImport={handleImport}
             />
 

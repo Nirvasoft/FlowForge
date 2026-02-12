@@ -551,9 +551,25 @@ export async function taskRoutes(fastify: FastifyInstance) {
   }, async (request: FastifyRequest<{ Querystring: { assigneeId?: string; status?: string; workflowId?: string; page?: number; pageSize?: number } }>, reply) => {
     const result = await service.listTasks(request.query as any);
 
-    // If in-memory has data, return it
+    // If in-memory has data, normalize fields for the frontend
     if (result.tasks && result.tasks.length > 0) {
-      return result;
+      return {
+        ...result,
+        tasks: result.tasks.map((t: any) => ({
+          ...t,
+          // Frontend expects 'name' not 'title'
+          name: t.name || t.title || 'Untitled Task',
+          // Frontend expects uppercase type (APPROVAL, REVIEW, etc.)
+          type: (t.type || t.taskType || 'TASK').toUpperCase(),
+          taskType: (t.type || t.taskType || 'TASK').toUpperCase(),
+          // Frontend expects 'status' in uppercase
+          status: (t.status || 'PENDING').toUpperCase(),
+          // Frontend expects dueAt
+          dueAt: t.dueAt || t.dueDate || null,
+          // Add workflow name for display
+          workflowName: t.workflowName || 'Leave Request Workflow',
+        })),
+      };
     }
 
     // Fallback: query Prisma TaskInstance table

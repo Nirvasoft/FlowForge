@@ -223,6 +223,14 @@ async function start() {
     } catch (err) {
       logger.warn({ err }, 'Failed to seed decision tables (non-fatal)');
     }
+
+    // Initialize email service (creates Ethereal test account in dev mode)
+    try {
+      const { emailService } = await import('./services/email/email.service.js');
+      await emailService.initialize();
+    } catch (err) {
+      logger.warn({ err }, 'Failed to initialize email service (non-fatal)');
+    }
   } catch (error) {
     logger.error({ error }, 'Failed to start server');
     process.exit(1);
