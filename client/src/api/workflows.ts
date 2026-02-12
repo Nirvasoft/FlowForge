@@ -120,7 +120,14 @@ export async function listAllInstances(params: { status?: string } = {}): Promis
     const response = await apiClient.get(`/executions?${searchParams.toString()}`);
     const body = response.data;
     // Backend returns { executions: [...], total, page, pageSize }
-    return body.executions || body.data || [];
+    const rawItems = body.executions || body.data || [];
+    // Normalize: in-memory uses workflowId, Prisma uses processId; status may be lowercase
+    return rawItems.map((inst: any) => ({
+        ...inst,
+        processId: inst.processId || inst.workflowId,
+        workflowName: inst.workflowName || undefined,
+        status: (inst.status || 'RUNNING').toUpperCase(),
+    }));
 }
 
 /**
@@ -150,7 +157,12 @@ export async function listTasks(params: ListTasksParams = {}): Promise<Paginated
     const response = await apiClient.get(`/tasks?${searchParams.toString()}`);
     const body = response.data;
     // Backend may return { tasks: [...], total } or { success, data, pagination }
-    const items = body.tasks || body.data || [];
+    const rawItems = body.tasks || body.data || [];
+    // Normalize: backend uses `taskType` but frontend expects `type`
+    const items = rawItems.map((t: any) => ({
+        ...t,
+        type: t.type || t.taskType || 'TASK',
+    }));
     const total = body.total ?? body.pagination?.total ?? items.length;
     const page = params.page || 1;
     const limit = params.limit || 20;
@@ -171,13 +183,23 @@ export async function getTask(taskId: string): Promise<Task> {
 }
 
 /**
- * Complete a task
+ * Claim a task
+ */
+export async function claimTask(taskId: string): Promise<Task> {
+    const response = await apiClient.post(`/tasks/${taskId}/claim`, {});
+    return response.data;
+}
+
+/**
+ * Complete a task with outcome
  */
 export async function completeTask(
     taskId: string,
-    output?: Record<string, unknown>
+    outcome: string,
+    data?: Record<string, unknown>,
+    comments?: string
 ): Promise<void> {
-    await post(`/tasks/${taskId}/complete`, { output });
+    await post(`/tasks/${taskId}/complete`, { outcome, data, comments });
 }
 
 /**

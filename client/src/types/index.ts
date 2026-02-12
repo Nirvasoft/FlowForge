@@ -107,9 +107,12 @@ export interface Process {
 export interface ProcessInstance {
     id: string;
     processId: string;
+    workflowName?: string;
     status: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'SUSPENDED';
     startedAt: string;
     completedAt?: string;
+    startedBy?: string;
+    variables?: Record<string, unknown>;
 }
 
 export interface Task {
@@ -119,6 +122,7 @@ export interface Task {
     description?: string;
     type: 'TASK' | 'APPROVAL' | 'REVIEW' | 'NOTIFICATION';
     status: 'PENDING' | 'CLAIMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'ESCALATED';
+    outcome?: string; // approved, rejected, completed, reviewed, etc.
     assigneeId?: string;
     dueAt?: string;
     createdAt: string;

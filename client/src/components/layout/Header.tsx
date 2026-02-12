@@ -12,9 +12,24 @@ interface HeaderProps {
 export function Header({ onMenuClick: _onMenuClick }: HeaderProps) {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
-    const [isDark, setIsDark] = useState(true);
+    const [isDark, setIsDark] = useState(() => {
+        // Initialize from localStorage or default to dark
+        const stored = localStorage.getItem('theme');
+        if (stored) return stored === 'dark';
+        return true; // default dark
+    });
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Apply theme on mount and when changed
+    useEffect(() => {
+        if (isDark) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    }, [isDark]);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -31,7 +46,6 @@ export function Header({ onMenuClick: _onMenuClick }: HeaderProps) {
     // Toggle theme
     const toggleTheme = () => {
         setIsDark(!isDark);
-        document.documentElement.classList.toggle('dark', !isDark);
     };
 
     const handleLogout = async () => {
@@ -42,7 +56,7 @@ export function Header({ onMenuClick: _onMenuClick }: HeaderProps) {
     const userName = user ? `${user.firstName} ${user.lastName}` : 'User';
 
     return (
-        <header className="sticky top-0 z-30 h-16 bg-surface-900/60 backdrop-blur-md border-b border-surface-700/50">
+        <header className="sticky top-0 z-30 h-16 bg-surface-900/80 backdrop-blur-md border-b border-surface-700/50 transition-colors duration-300">
             <div className="h-full px-4 lg:px-6 flex items-center justify-between gap-4">
                 {/* Search */}
                 <div className="flex-1 max-w-xl">

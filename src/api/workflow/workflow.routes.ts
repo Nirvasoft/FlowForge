@@ -632,11 +632,23 @@ export async function taskRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     const userId = 'user-1';
     try {
+      // Try in-memory first
       const task = await service.claimTask(request.params.taskId, userId);
-      if (!task) {
+      if (task) return task;
+
+      // Fallback: update in Prisma
+      const dbTask = await prisma.taskInstance.findUnique({ where: { id: request.params.taskId } });
+      if (!dbTask) {
         return reply.status(404).send({ error: 'Task not found' });
       }
-      return task;
+      if (dbTask.status !== 'PENDING') {
+        return reply.status(400).send({ error: 'Can only claim pending tasks' });
+      }
+      const updated = await prisma.taskInstance.update({
+        where: { id: request.params.taskId },
+        data: { status: 'CLAIMED', assigneeId: dbTask.assigneeId },
+      });
+      return updated;
     } catch (error) {
       return reply.status(400).send({ error: (error as Error).message });
     }
@@ -649,10 +661,18 @@ export async function taskRoutes(fastify: FastifyInstance) {
     const userId = 'user-1';
     try {
       const task = await service.releaseTask(request.params.taskId, userId);
-      if (!task) {
+      if (task) return task;
+
+      // Fallback: update in Prisma
+      const dbTask = await prisma.taskInstance.findUnique({ where: { id: request.params.taskId } });
+      if (!dbTask) {
         return reply.status(404).send({ error: 'Task not found' });
       }
-      return task;
+      const updated = await prisma.taskInstance.update({
+        where: { id: request.params.taskId },
+        data: { status: 'PENDING' },
+      });
+      return updated;
     } catch (error) {
       return reply.status(400).send({ error: (error as Error).message });
     }
@@ -664,6 +684,7 @@ export async function taskRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     const userId = 'user-1';
     try {
+      // Try in-memory first
       const task = await service.completeTask(
         request.params.taskId,
         userId,
@@ -671,10 +692,27 @@ export async function taskRoutes(fastify: FastifyInstance) {
         request.body.data,
         request.body.comments
       );
-      if (!task) {
+      if (task) return task;
+
+      // Fallback: update in Prisma
+      const dbTask = await prisma.taskInstance.findUnique({ where: { id: request.params.taskId } });
+      if (!dbTask) {
         return reply.status(404).send({ error: 'Task not found' });
       }
-      return task;
+      if (dbTask.status === 'COMPLETED' || dbTask.status === 'CANCELLED') {
+        return reply.status(400).send({ error: 'Task is not in a completable state' });
+      }
+      const updated = await prisma.taskInstance.update({
+        where: { id: request.params.taskId },
+        data: {
+          status: 'COMPLETED',
+          outcome: request.body.outcome,
+          comments: request.body.comments,
+          completedAt: new Date(),
+          completedBy: dbTask.assigneeId,
+        },
+      });
+      return updated;
     } catch (error) {
       return reply.status(400).send({ error: (error as Error).message });
     }

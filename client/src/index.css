@@ -4,6 +4,61 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =============================================
+   Theme CSS Variables
+   ============================================= */
+
+/* Light theme (default) */
+:root {
+  --surface-50: 248 250 252;   /* #f8fafc */
+  --surface-100: 241 245 249;  /* #f1f5f9 */
+  --surface-200: 226 232 240;  /* #e2e8f0 */
+  --surface-300: 203 213 225;  /* #cbd5e1 */
+  --surface-400: 148 163 184;  /* #94a3b8 */
+  --surface-500: 100 116 139;  /* #64748b */
+  --surface-600: 71 85 105;    /* #475569 */
+  --surface-700: 51 65 85;     /* #334155 */
+  --surface-800: 30 41 59;     /* #1e293b */
+  --surface-900: 15 23 42;     /* #0f172a */
+  --surface-950: 2 6 23;       /* #020617 */
+
+  /* Light mode overrides — remap so surface-900 (used for bg) becomes light */
+  --color-surface-50: 2 6 23;         /* darkest text */
+  --color-surface-100: 15 23 42;      /* heading text */
+  --color-surface-200: 30 41 59;      /* body text */
+  --color-surface-300: 51 65 85;      /* secondary text */
+  --color-surface-400: 100 116 139;   /* muted text */
+  --color-surface-500: 148 163 184;   /* placeholder text */
+  --color-surface-600: 203 213 225;   /* borders */
+  --color-surface-700: 226 232 240;   /* dividers */
+  --color-surface-800: 241 245 249;   /* card bg */
+  --color-surface-900: 248 250 252;   /* sidebar/header bg */
+  --color-surface-950: 255 255 255;   /* page bg */
+
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.06);
+  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.2);
+  --shadow-glow-lg: 0 0 40px rgba(99, 102, 241, 0.25);
+}
+
+/* Dark theme */
+.dark {
+  --color-surface-50: 248 250 252;
+  --color-surface-100: 241 245 249;
+  --color-surface-200: 226 232 240;
+  --color-surface-300: 203 213 225;
+  --color-surface-400: 148 163 184;
+  --color-surface-500: 100 116 139;
+  --color-surface-600: 71 85 105;
+  --color-surface-700: 51 65 85;
+  --color-surface-800: 30 41 59;
+  --color-surface-900: 15 23 42;
+  --color-surface-950: 2 6 23;
+
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3);
+  --shadow-glow-lg: 0 0 40px rgba(99, 102, 241, 0.4);
+}
+
 /* Custom base styles */
 @layer base {
   html {
@@ -12,19 +67,38 @@
   
   body {
     @apply bg-surface-950 text-surface-100 font-sans antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
   
-  /* Custom scrollbar for dark mode */
+  /* Dark mode scrollbar */
+  .dark ::-webkit-scrollbar {
+    @apply w-2;
+  }
+  
+  .dark ::-webkit-scrollbar-track {
+    @apply bg-surface-900;
+  }
+  
+  .dark ::-webkit-scrollbar-thumb {
+    @apply bg-surface-600 rounded-full hover:bg-surface-500;
+  }
+
+  /* Light mode scrollbar */
   ::-webkit-scrollbar {
     @apply w-2;
   }
   
   ::-webkit-scrollbar-track {
-    @apply bg-surface-900;
+    background: rgb(var(--color-surface-950));
   }
   
   ::-webkit-scrollbar-thumb {
-    @apply bg-surface-600 rounded-full hover:bg-surface-500;
+    background: rgb(var(--color-surface-600));
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--color-surface-500));
   }
 }
 
@@ -32,28 +106,24 @@
 @layer components {
   /* Glass card effect */
   .glass-card {
-    @apply bg-surface-900/60 backdrop-blur-md border border-surface-700/50 rounded-xl shadow-glass;
+    @apply bg-surface-900/60 backdrop-blur-md border border-surface-700/50 rounded-xl;
+    box-shadow: var(--shadow-glass);
   }
   
   /* Gradient text */
   .gradient-text {
     @apply bg-gradient-to-r from-primary-400 via-accent-400 to-primary-400 bg-clip-text text-transparent;
   }
+
+  /* In light mode, gradient text should use deeper brand colors */
+  :root:not(.dark) .gradient-text {
+    @apply from-primary-600 via-accent-600 to-primary-600;
+  }
   
   /* Focus ring */
   .focus-ring {
-    @apply focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:ring-offset-2 focus:ring-offset-surface-900;
-  }
-  
-  /* Animated gradient border */
-  .gradient-border {
-    @apply relative;
-  }
-  
-  .gradient-border::before {
-    content: '';
-    @apply absolute inset-0 rounded-xl bg-gradient-to-r from-primary-500 via-accent-500 to-primary-500 -z-10;
-    padding: 1px;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:ring-offset-2;
+    --tw-ring-offset-color: rgb(var(--color-surface-950));
   }
   
   /* Button base */
@@ -64,7 +134,12 @@
   
   .btn-primary {
     @apply btn bg-gradient-to-r from-primary-600 to-primary-500 text-white 
-           hover:from-primary-500 hover:to-primary-400 hover:shadow-glow active:scale-[0.98];
+           hover:from-primary-500 hover:to-primary-400 active:scale-[0.98];
+    box-shadow: var(--shadow-glow);
+  }
+
+  .btn-primary:hover {
+    box-shadow: var(--shadow-glow-lg);
   }
   
   .btn-secondary {

@@ -561,7 +561,7 @@ function WorkflowDesignerInner() {
             {/* Execution Result Modal */}
             {executionResult && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                    <div className="bg-surface-800 border border-surface-600 rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+                    <div className="bg-surface-800 border border-surface-600 rounded-2xl shadow-2xl p-6 max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
                         <div className="flex items-center gap-3 mb-4">
                             {executionResult.success ? (
                                 <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
@@ -577,45 +577,108 @@ function WorkflowDesignerInner() {
                             </h2>
                         </div>
 
-                        {executionResult.success && executionResult.data && (
-                            <div className="space-y-2 mb-6">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-surface-400">Execution ID</span>
-                                    <span className="text-surface-200 font-mono text-xs">
-                                        {executionResult.data.id?.slice(0, 8) || '—'}...
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-surface-400">Status</span>
-                                    <span className={cn(
-                                        'px-2 py-0.5 rounded-full text-xs font-medium',
-                                        executionResult.data.status === 'completed' && 'bg-green-500/20 text-green-300',
-                                        executionResult.data.status === 'running' && 'bg-blue-500/20 text-blue-300',
-                                        executionResult.data.status === 'failed' && 'bg-red-500/20 text-red-300',
-                                        executionResult.data.status === 'waiting' && 'bg-amber-500/20 text-amber-300',
-                                        !['completed', 'running', 'failed', 'waiting'].includes(executionResult.data.status) && 'bg-surface-600 text-surface-300'
-                                    )}>
-                                        {executionResult.data.status || 'unknown'}
-                                    </span>
-                                </div>
-                                {executionResult.data.currentNodes && executionResult.data.currentNodes.length > 0 && (
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-surface-400">Current Node</span>
-                                        <span className="text-surface-200">
-                                            {executionResult.data.currentNodes.join(', ')}
-                                        </span>
+                        <div className="overflow-y-auto flex-1 space-y-4">
+                            {executionResult.success && executionResult.data && (
+                                <>
+                                    {/* Basic Info */}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-surface-400">Execution ID</span>
+                                            <span className="text-surface-200 font-mono text-xs">
+                                                {executionResult.data.id?.slice(0, 8) || '—'}...
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-surface-400">Status</span>
+                                            <span className={cn(
+                                                'px-2 py-0.5 rounded-full text-xs font-medium',
+                                                executionResult.data.status === 'completed' && 'bg-green-500/20 text-green-300',
+                                                executionResult.data.status === 'running' && 'bg-blue-500/20 text-blue-300',
+                                                executionResult.data.status === 'failed' && 'bg-red-500/20 text-red-300',
+                                                executionResult.data.status === 'waiting' && 'bg-amber-500/20 text-amber-300',
+                                                !['completed', 'running', 'failed', 'waiting'].includes(executionResult.data.status) && 'bg-surface-600 text-surface-300'
+                                            )}>
+                                                {executionResult.data.status || 'unknown'}
+                                            </span>
+                                        </div>
                                     </div>
-                                )}
-                            </div>
-                        )}
 
-                        {!executionResult.success && executionResult.error && (
-                            <div className="mb-6 p-3 bg-red-900/30 border border-red-700/50 rounded-lg">
-                                <p className="text-sm text-red-300">{executionResult.error}</p>
-                            </div>
-                        )}
+                                    {/* Metrics */}
+                                    {executionResult.data.metrics && (
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div className="bg-surface-700/50 rounded-lg p-2.5 text-center">
+                                                <div className="text-lg font-bold text-surface-100">{executionResult.data.metrics.nodeExecutions || 0}</div>
+                                                <div className="text-xs text-surface-400">Nodes Run</div>
+                                            </div>
+                                            <div className="bg-surface-700/50 rounded-lg p-2.5 text-center">
+                                                <div className="text-lg font-bold text-green-400">{executionResult.data.metrics.completedTasks || 0}</div>
+                                                <div className="text-xs text-surface-400">Tasks Done</div>
+                                            </div>
+                                            <div className="bg-surface-700/50 rounded-lg p-2.5 text-center">
+                                                <div className="text-lg font-bold text-amber-400">{executionResult.data.metrics.pendingTasks || 0}</div>
+                                                <div className="text-xs text-surface-400">Pending</div>
+                                            </div>
+                                        </div>
+                                    )}
 
-                        <div className="flex justify-end gap-2">
+                                    {/* Completed Nodes */}
+                                    {executionResult.data.completedNodes && executionResult.data.completedNodes.length > 0 && (
+                                        <div>
+                                            <h3 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Node Progress</h3>
+                                            <div className="space-y-1">
+                                                {executionResult.data.completedNodes.map((nodeId: string, index: number) => {
+                                                    const node = nodes.find(n => n.id === nodeId);
+                                                    return (
+                                                        <div key={nodeId} className="flex items-center gap-2 text-sm">
+                                                            <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                                                                <CheckCircle className="w-3 h-3 text-green-400" />
+                                                            </div>
+                                                            <span className="text-surface-300">{String(node?.data?.label || nodeId)}</span>
+                                                            {index < (executionResult.data.completedNodes?.length || 0) - 1 && (
+                                                                <span className="text-surface-600 ml-auto">→</span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Execution Log */}
+                                    {executionResult.data.logs && executionResult.data.logs.length > 0 && (
+                                        <div>
+                                            <h3 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Execution Log</h3>
+                                            <div className="bg-surface-900/50 rounded-lg p-2 max-h-40 overflow-y-auto space-y-0.5">
+                                                {executionResult.data.logs.map((log: { level: string; nodeId?: string; message: string }, i: number) => (
+                                                    <div key={i} className="flex items-start gap-1.5 text-xs font-mono">
+                                                        <span className={cn(
+                                                            'flex-shrink-0 px-1 rounded',
+                                                            log.level === 'info' && 'text-blue-400 bg-blue-400/10',
+                                                            log.level === 'warn' && 'text-amber-400 bg-amber-400/10',
+                                                            log.level === 'error' && 'text-red-400 bg-red-400/10',
+                                                        )}>
+                                                            {log.level}
+                                                        </span>
+                                                        {log.nodeId && (
+                                                            <span className="text-surface-500 flex-shrink-0">[{log.nodeId}]</span>
+                                                        )}
+                                                        <span className="text-surface-300 break-all">{log.message}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            {!executionResult.success && executionResult.error && (
+                                <div className="p-3 bg-red-900/30 border border-red-700/50 rounded-lg">
+                                    <p className="text-sm text-red-300">{executionResult.error}</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-surface-700">
                             <Button variant="secondary" size="sm" onClick={() => setExecutionResult(null)}>
                                 Close
                             </Button>

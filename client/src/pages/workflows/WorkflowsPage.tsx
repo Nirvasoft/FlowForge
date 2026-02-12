@@ -14,7 +14,12 @@ import {
     CheckCircle,
     Clock,
     AlertCircle,
-    XCircle
+    XCircle,
+    ThumbsUp,
+    ThumbsDown,
+    UserCheck,
+    Timer,
+    StopCircle
 } from 'lucide-react';
 import {
     Button,
@@ -27,7 +32,7 @@ import {
     ModalFooter
 } from '../../components/ui';
 import { cn } from '../../lib/utils';
-import { listProcesses, listTasks, listAllInstances, createProcess, updateProcess, deleteProcess } from '../../api/workflows';
+import { listProcesses, listTasks, listAllInstances, createProcess, updateProcess, deleteProcess, claimTask, completeTask, cancelProcessInstance } from '../../api/workflows';
 import type { Process, ProcessInstance, Task } from '../../types';
 
 const processStatusVariants: Record<Process['status'], 'success' | 'warning' | 'info' | 'error'> = {
@@ -35,14 +40,6 @@ const processStatusVariants: Record<Process['status'], 'success' | 'warning' | '
     DRAFT: 'warning',
     DEPRECATED: 'error',
     ARCHIVED: 'info',
-};
-
-const instanceStatusIcons: Record<ProcessInstance['status'], React.ReactNode> = {
-    RUNNING: <Clock className="h-4 w-4 text-blue-400" />,
-    COMPLETED: <CheckCircle className="h-4 w-4 text-green-400" />,
-    FAILED: <XCircle className="h-4 w-4 text-red-400" />,
-    CANCELLED: <XCircle className="h-4 w-4 text-surface-400" />,
-    SUSPENDED: <Pause className="h-4 w-4 text-yellow-400" />,
 };
 
 type TabType = 'processes' | 'instances' | 'tasks';
@@ -107,17 +104,19 @@ export function WorkflowsPage() {
         }
     }, [statusFilter]);
 
+    // Always load tasks and instances eagerly so badge counts are accurate
+    useEffect(() => {
+        loadTasks();
+        loadInstances();
+    }, [loadTasks, loadInstances]);
+
     useEffect(() => {
         if (activeTab === 'processes') {
             loadProcesses();
-        } else if (activeTab === 'tasks') {
-            loadTasks();
-        } else if (activeTab === 'instances') {
-            loadInstances();
         } else {
             setIsLoading(false);
         }
-    }, [activeTab, loadProcesses, loadTasks, loadInstances]);
+    }, [activeTab, loadProcesses]);
 
     // Close dropdown
     useEffect(() => {
@@ -141,6 +140,26 @@ export function WorkflowsPage() {
         const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
         return matchesSearch && matchesStatus;
     });
+
+    // Filter instances
+    const filteredInstances = instances.filter((inst) => {
+        const name = inst.workflowName || '';
+        const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            inst.id.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesStatus = statusFilter === 'all' || inst.status === statusFilter;
+        return matchesSearch && matchesStatus;
+    });
+
+    // Duration helper
+    const getDuration = (start: string, end?: string) => {
+        const startMs = new Date(start).getTime();
+        const endMs = end ? new Date(end).getTime() : Date.now();
+        const diff = endMs - startMs;
+        if (diff < 1000) return '<1s';
+        if (diff < 60000) return `${Math.round(diff / 1000)}s`;
+        if (diff < 3600000) return `${Math.floor(diff / 60000)}m ${Math.round((diff % 60000) / 1000)}s`;
+        return `${Math.floor(diff / 3600000)}h ${Math.floor((diff % 3600000) / 60000)}m`;
+    };
 
     const handleCreate = useCallback(async (processData: { name: string; description?: string }) => {
         try {
@@ -190,7 +209,7 @@ export function WorkflowsPage() {
 
     const tabs: { id: TabType; label: string; count?: number }[] = [
         { id: 'processes', label: 'Workflows', count: processes.length },
-        { id: 'instances', label: 'Running', count: instances.filter(i => i.status === 'RUNNING').length },
+        { id: 'instances', label: 'Executions', count: instances.length },
         { id: 'tasks', label: 'My Tasks', count: tasks.filter(t => t.status === 'PENDING' || t.status === 'IN_PROGRESS').length },
     ];
 
@@ -317,7 +336,7 @@ export function WorkflowsPage() {
                         </Card>
                     ) : (
                         filteredProcesses.map((process) => (
-                            <Card key={process.id} className="hover:border-surface-600 transition-colors">
+                            <Card key={process.id} className="hover:border-surface-600 transition-colors cursor-pointer" onClick={() => navigate(`/workflows/${process.id}/design`)}>
                                 <CardContent className="p-5">
                                     <div className="flex items-start justify-between">
                                         <div className="flex items-start gap-3">
@@ -415,45 +434,99 @@ export function WorkflowsPage() {
 
             {activeTab === 'instances' && (
                 <Card>
-                    <CardHeader title="Running Instances" description="Active workflow executions" />
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="border-b border-surface-700/50">
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-surface-400 uppercase">Instance</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-surface-400 uppercase">Workflow</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-surface-400 uppercase">Status</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-surface-400 uppercase">Started</th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-surface-400 uppercase">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-surface-700/50">
-                                {instances.map((instance) => {
-                                    const process = processes.find(p => p.id === instance.processId);
-                                    return (
-                                        <tr key={instance.id} className="hover:bg-surface-800/30 transition-colors">
-                                            <td className="px-6 py-4 font-mono text-sm text-surface-300">{instance.id}</td>
-                                            <td className="px-6 py-4 text-surface-200">{process?.name || 'Unknown'}</td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    {instanceStatusIcons[instance.status]}
-                                                    <span className="text-surface-300">{instance.status}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-surface-400 text-sm">
-                                                {new Date(instance.startedAt).toLocaleString()}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <Button variant="ghost" size="sm">
-                                                    <Eye className="h-4 w-4" />
-                                                </Button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                    <CardHeader title="Workflow Executions" description="History of all workflow runs" />
+                    <div className="px-6 pb-4 flex items-center gap-2">
+                        {(['all', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED'] as const).map((s) => (
+                            <button
+                                key={s}
+                                onClick={() => setStatusFilter(s)}
+                                className={cn(
+                                    'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                                    statusFilter === s
+                                        ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
+                                        : 'text-surface-400 hover:text-surface-200 hover:bg-surface-700/50'
+                                )}
+                            >
+                                {s === 'all' ? 'All' : s.charAt(0) + s.slice(1).toLowerCase()}
+                            </button>
+                        ))}
                     </div>
+                    {filteredInstances.length === 0 ? (
+                        <div className="px-6 py-12 text-center">
+                            <Play className="h-8 w-8 text-surface-500 mx-auto mb-2" />
+                            <p className="text-surface-400">No executions to show</p>
+                            <p className="text-sm text-surface-500 mt-1">Run a workflow to see execution history here</p>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-surface-700/50">
+                            {filteredInstances.map((instance) => {
+                                const wfName = instance.workflowName || processes.find(p => p.id === instance.processId)?.name || 'Unknown Workflow';
+                                const statusVariant: Record<string, 'success' | 'warning' | 'info' | 'error'> = {
+                                    RUNNING: 'info',
+                                    COMPLETED: 'success',
+                                    FAILED: 'error',
+                                    CANCELLED: 'warning',
+                                    SUSPENDED: 'warning',
+                                };
+                                return (
+                                    <div key={instance.id} className="px-6 py-4 hover:bg-surface-800/30 transition-colors">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className={cn(
+                                                    'p-2 rounded-lg',
+                                                    instance.status === 'COMPLETED' ? 'bg-green-500/10 text-green-400' :
+                                                        instance.status === 'FAILED' ? 'bg-red-500/10 text-red-400' :
+                                                            instance.status === 'RUNNING' ? 'bg-blue-500/10 text-blue-400' :
+                                                                'bg-yellow-500/10 text-yellow-400'
+                                                )}>
+                                                    {instance.status === 'COMPLETED' ? <CheckCircle className="h-5 w-5" /> :
+                                                        instance.status === 'FAILED' ? <XCircle className="h-5 w-5" /> :
+                                                            instance.status === 'RUNNING' ? <Play className="h-5 w-5" /> :
+                                                                instance.status === 'SUSPENDED' ? <Pause className="h-5 w-5" /> :
+                                                                    <StopCircle className="h-5 w-5" />}
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-medium text-surface-100">{wfName}</h4>
+                                                    <p className="text-sm text-surface-400">
+                                                        <span className="font-mono text-xs text-surface-500">{instance.id.substring(0, 8)}…</span>
+                                                        {' • '}
+                                                        {new Date(instance.startedAt).toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-1 text-sm text-surface-400">
+                                                    <Timer className="h-3.5 w-3.5" />
+                                                    {getDuration(instance.startedAt, instance.completedAt)}
+                                                </div>
+                                                <Badge variant={statusVariant[instance.status] || 'info'}>
+                                                    {instance.status}
+                                                </Badge>
+                                                {(instance.status === 'RUNNING' || instance.status === 'SUSPENDED') && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="secondary"
+                                                        className="!bg-red-500/10 !text-red-400 !border-red-500/30 hover:!bg-red-500/20"
+                                                        onClick={async () => {
+                                                            try {
+                                                                await cancelProcessInstance(instance.id);
+                                                                loadInstances();
+                                                            } catch (err) {
+                                                                setError(err instanceof Error ? err.message : 'Failed to cancel');
+                                                            }
+                                                        }}
+                                                    >
+                                                        <XCircle className="h-3.5 w-3.5" />
+                                                        Cancel
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </Card>
             )}
 
@@ -467,52 +540,127 @@ export function WorkflowsPage() {
                                 <p className="text-surface-400">No tasks to show</p>
                             </div>
                         ) : (
-                            filteredTasks.map((task) => (
-                                <div key={task.id} className="px-6 py-4 hover:bg-surface-800/30 transition-colors">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className={cn(
-                                                'p-2 rounded-lg',
-                                                task.status === 'COMPLETED' ? 'bg-green-500/10 text-green-400' :
-                                                    task.status === 'IN_PROGRESS' ? 'bg-blue-500/10 text-blue-400' :
-                                                        'bg-yellow-500/10 text-yellow-400'
-                                            )}>
-                                                {task.type === 'APPROVAL' ? <CheckCircle className="h-5 w-5" /> :
-                                                    task.type === 'REVIEW' ? <Eye className="h-5 w-5" /> :
-                                                        <Clock className="h-5 w-5" />}
-                                            </div>
-                                            <div>
-                                                <h4 className="font-medium text-surface-100">{task.name}</h4>
-                                                <p className="text-sm text-surface-400">
-                                                    {task.type} • Created {new Date(task.createdAt).toLocaleDateString()}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            {task.dueAt && (
-                                                <div className="flex items-center gap-1 text-sm text-yellow-400">
-                                                    <AlertCircle className="h-4 w-4" />
-                                                    Due {new Date(task.dueAt).toLocaleDateString()}
+                            filteredTasks.map((task) => {
+                                const isRejected = task.status === 'COMPLETED' && task.outcome === 'rejected';
+                                const isApproved = task.status === 'COMPLETED' && task.outcome === 'approved';
+                                return (
+                                    <div key={task.id} className="px-6 py-4 hover:bg-surface-800/30 transition-colors">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className={cn(
+                                                    'p-2 rounded-lg',
+                                                    isRejected ? 'bg-red-500/10 text-red-400' :
+                                                        isApproved ? 'bg-green-500/10 text-green-400' :
+                                                            task.status === 'COMPLETED' ? 'bg-green-500/10 text-green-400' :
+                                                                task.status === 'IN_PROGRESS' || task.status === 'CLAIMED' ? 'bg-blue-500/10 text-blue-400' :
+                                                                    'bg-yellow-500/10 text-yellow-400'
+                                                )}>
+                                                    {isRejected ? <ThumbsDown className="h-5 w-5" /> :
+                                                        task.type === 'APPROVAL' ? <ThumbsUp className="h-5 w-5" /> :
+                                                            task.type === 'REVIEW' ? <Eye className="h-5 w-5" /> :
+                                                                <Clock className="h-5 w-5" />}
                                                 </div>
-                                            )}
-                                            <Badge
-                                                variant={
-                                                    task.status === 'COMPLETED' ? 'success' :
-                                                        task.status === 'IN_PROGRESS' ? 'info' :
-                                                            'warning'
-                                                }
-                                            >
-                                                {task.status.replace('_', ' ')}
-                                            </Badge>
-                                            {task.status !== 'COMPLETED' && (
-                                                <Button size="sm">
-                                                    {task.status === 'PENDING' ? 'Claim' : 'Complete'}
-                                                </Button>
-                                            )}
+                                                <div>
+                                                    <h4 className="font-medium text-surface-100">{task.name}</h4>
+                                                    <p className="text-sm text-surface-400">
+                                                        {task.type} • Created {new Date(task.createdAt).toLocaleDateString()}
+                                                        {(task as any).workflowName && (
+                                                            <span className="text-surface-500"> • {(task as any).workflowName}</span>
+                                                        )}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                {task.dueAt && (
+                                                    <div className="flex items-center gap-1 text-sm text-yellow-400">
+                                                        <AlertCircle className="h-4 w-4" />
+                                                        Due {new Date(task.dueAt).toLocaleDateString()}
+                                                    </div>
+                                                )}
+                                                <Badge
+                                                    variant={
+                                                        isRejected ? 'error' :
+                                                            isApproved ? 'success' :
+                                                                task.status === 'COMPLETED' ? 'success' :
+                                                                    task.status === 'IN_PROGRESS' || task.status === 'CLAIMED' ? 'info' :
+                                                                        'warning'
+                                                    }
+                                                >
+                                                    {task.status === 'COMPLETED' && task.outcome
+                                                        ? task.outcome.toUpperCase()
+                                                        : task.status.replace('_', ' ')}
+                                                </Badge>
+                                                {/* Action buttons based on task status and type */}
+                                                {task.status === 'PENDING' && (
+                                                    <Button size="sm" onClick={async () => {
+                                                        try {
+                                                            await claimTask(task.id);
+                                                            loadTasks();
+                                                        } catch (err) {
+                                                            setError(err instanceof Error ? err.message : 'Failed to claim task');
+                                                        }
+                                                    }}>
+                                                        <UserCheck className="h-3.5 w-3.5" />
+                                                        Claim
+                                                    </Button>
+                                                )}
+                                                {(task.status === 'CLAIMED' || task.status === 'IN_PROGRESS') && task.type === 'APPROVAL' && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Button size="sm" variant="secondary" className="!bg-green-500/10 !text-green-400 !border-green-500/30 hover:!bg-green-500/20" onClick={async () => {
+                                                            try {
+                                                                await completeTask(task.id, 'approved');
+                                                                loadTasks();
+                                                            } catch (err) {
+                                                                setError(err instanceof Error ? err.message : 'Failed to approve task');
+                                                            }
+                                                        }}>
+                                                            <ThumbsUp className="h-3.5 w-3.5" />
+                                                            Approve
+                                                        </Button>
+                                                        <Button size="sm" variant="secondary" className="!bg-red-500/10 !text-red-400 !border-red-500/30 hover:!bg-red-500/20" onClick={async () => {
+                                                            try {
+                                                                await completeTask(task.id, 'rejected');
+                                                                loadTasks();
+                                                            } catch (err) {
+                                                                setError(err instanceof Error ? err.message : 'Failed to reject task');
+                                                            }
+                                                        }}>
+                                                            <ThumbsDown className="h-3.5 w-3.5" />
+                                                            Reject
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                                {(task.status === 'CLAIMED' || task.status === 'IN_PROGRESS') && task.type === 'REVIEW' && (
+                                                    <Button size="sm" onClick={async () => {
+                                                        try {
+                                                            await completeTask(task.id, 'reviewed');
+                                                            loadTasks();
+                                                        } catch (err) {
+                                                            setError(err instanceof Error ? err.message : 'Failed to complete review');
+                                                        }
+                                                    }}>
+                                                        <CheckCircle className="h-3.5 w-3.5" />
+                                                        Mark Reviewed
+                                                    </Button>
+                                                )}
+                                                {(task.status === 'CLAIMED' || task.status === 'IN_PROGRESS') && task.type !== 'APPROVAL' && task.type !== 'REVIEW' && (
+                                                    <Button size="sm" onClick={async () => {
+                                                        try {
+                                                            await completeTask(task.id, 'completed');
+                                                            loadTasks();
+                                                        } catch (err) {
+                                                            setError(err instanceof Error ? err.message : 'Failed to complete task');
+                                                        }
+                                                    }}>
+                                                        <CheckCircle className="h-3.5 w-3.5" />
+                                                        Complete
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 </Card>
