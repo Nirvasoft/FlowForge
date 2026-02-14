@@ -809,30 +809,41 @@ model DatasetRecord {
 // ============================================================================
 
 model DecisionTable {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  accountId   String   @map("account_id") @db.Uuid
-  name        String   @db.VarChar(200)
-  description String?  @db.Text
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId       String   @map("account_id") @db.Uuid
+  name            String   @db.VarChar(200)
+  slug            String?  @db.VarChar(200)
+  description     String?  @db.Text
   
   // Decision table definition
-  inputSchema Json     @map("input_schema") @default("[]")
-  outputSchema Json    @map("output_schema") @default("[]")
-  rules       Json     @default("[]")
-  hitPolicy   HitPolicy @map("hit_policy") @default(FIRST)
+  inputSchema     Json     @map("input_schema") @default("[]")
+  outputSchema    Json     @map("output_schema") @default("[]")
+  rules           Json     @default("[]")
+  hitPolicy       HitPolicy @map("hit_policy") @default(FIRST)
+  settings        Json     @default("{}")
   
   // Versioning
-  version     Int      @default(1)
-  status      DecisionTableStatus @default(DRAFT)
+  version         Int      @default(1)
+  status          DecisionTableStatus @default(DRAFT)
+  
+  // Publishing
+  publishedAt     DateTime? @map("published_at")
+  publishedBy     String?   @map("published_by") @db.Uuid
+  
+  // Usage tracking
+  evaluationCount Int       @default(0) @map("evaluation_count")
+  lastEvaluatedAt DateTime? @map("last_evaluated_at")
   
   // Timestamps
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  createdBy   String   @map("created_by") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdBy       String   @map("created_by") @db.Uuid
   
   // Relations
-  account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account         Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
   
   @@index([accountId])
+  @@index([slug])
   @@map("decision_tables")
 }
 
@@ -847,8 +858,8 @@ enum HitPolicy {
 
 enum DecisionTableStatus {
   DRAFT
-  ACTIVE
-  DEPRECATED
+  PUBLISHED
+  ARCHIVED
 }
 
 // ============================================================================

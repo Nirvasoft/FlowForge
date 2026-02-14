@@ -1,6 +1,6 @@
 /**
  * FlowForge Decision Table Service
- * CRUD operations and evaluation
+ * CRUD operations and evaluation with Prisma persistence
  */
 
 import { randomUUID } from 'crypto';
@@ -18,15 +18,112 @@ import type {
   HitPolicy,
   ConditionExpression,
 } from '../../types/decisions';
+import type { DRDDiagram, DRDNode, DRDEdge } from '../../types/decisions/drd';
 import { DecisionEngine, decisionEngine } from './engine';
+import { prisma } from '../../utils/prisma.js';
+import { auditService } from '../audit/audit.service';
 
 // ============================================================================
-// In-Memory Storage
+// In-Memory Storage (cache; Prisma is the fallback source of truth)
 // ============================================================================
 
 const tables = new Map<string, DecisionTable>();
 const evaluationLogs = new Map<string, EvaluationLog[]>();
 const testCases = new Map<string, TestCase[]>();
+const drdDiagrams = new Map<string, DRDDiagram>();
+
+// ============================================================================
+// Persistence Helpers
+// ============================================================================
+
+const DEFAULT_ACCOUNT_ID = '56dc14cc-16f6-45ef-9797-c77a648ed6f2';
+const DEFAULT_USER_ID = '30620aae-f229-40f0-8f3d-31704087fed4';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUUID = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v);
+
+function statusToDb(s: string): 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' {
+  const map: Record<string, 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'> = {
+    draft: 'DRAFT', published: 'PUBLISHED', archived: 'ARCHIVED',
+  };
+  return map[s?.toLowerCase()] || 'DRAFT';
+}
+
+function statusFromDb(s: string): 'draft' | 'published' | 'archived' {
+  const map: Record<string, 'draft' | 'published' | 'archived'> = {
+    DRAFT: 'draft', PUBLISHED: 'published', ARCHIVED: 'archived',
+  };
+  return map[s] || 'draft';
+}
+
+function dbRecordToTable(record: any): DecisionTable {
+  return {
+    id: record.id,
+    name: record.name,
+    slug: record.slug || record.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+    description: record.description || undefined,
+    inputs: Array.isArray(record.inputSchema) ? record.inputSchema : [],
+    outputs: Array.isArray(record.outputSchema) ? record.outputSchema : [],
+    rules: Array.isArray(record.rules) ? record.rules : [],
+    hitPolicy: (record.hitPolicy as HitPolicy) || 'FIRST',
+    settings: (record.settings as DecisionTableSettings) || {
+      validateInputs: true, strictMode: false, cacheEnabled: true, cacheDuration: 60000, logEvaluations: true,
+    },
+    version: record.version || 1,
+    status: statusFromDb(record.status),
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    createdBy: record.createdBy || 'system',
+    publishedAt: record.publishedAt || undefined,
+    publishedBy: record.publishedBy || undefined,
+    evaluationCount: record.evaluationCount || 0,
+    lastEvaluatedAt: record.lastEvaluatedAt || undefined,
+  };
+}
+
+async function syncTableToDb(table: DecisionTable): Promise<void> {
+  try {
+    await prisma.decisionTable.upsert({
+      where: { id: table.id },
+      update: {
+        name: table.name,
+        slug: table.slug,
+        description: table.description || null,
+        inputSchema: table.inputs as any,
+        outputSchema: table.outputs as any,
+        rules: table.rules as any,
+        hitPolicy: table.hitPolicy as any,
+        settings: (table.settings || {}) as any,
+        version: table.version || 1,
+        status: statusToDb(table.status) as any,
+        publishedAt: table.publishedAt || null,
+        publishedBy: isUUID(table.publishedBy) ? table.publishedBy : null,
+        evaluationCount: table.evaluationCount || 0,
+        lastEvaluatedAt: table.lastEvaluatedAt || null,
+      } as any,
+      create: {
+        id: table.id,
+        accountId: DEFAULT_ACCOUNT_ID,
+        name: table.name,
+        slug: table.slug,
+        description: table.description || null,
+        inputSchema: table.inputs as any,
+        outputSchema: table.outputs as any,
+        rules: table.rules as any,
+        hitPolicy: table.hitPolicy as any,
+        settings: (table.settings || {}) as any,
+        version: table.version || 1,
+        status: statusToDb(table.status) as any,
+        publishedAt: table.publishedAt || null,
+        publishedBy: isUUID(table.publishedBy) ? table.publishedBy : null,
+        evaluationCount: table.evaluationCount || 0,
+        lastEvaluatedAt: table.lastEvaluatedAt || null,
+        createdBy: isUUID(table.createdBy) ? table.createdBy : DEFAULT_USER_ID,
+      } as any,
+    });
+  } catch (e) {
+    console.warn('syncTableToDb failed:', (e as Error).message);
+  }
+}
 
 // ============================================================================
 // Default Settings
@@ -85,19 +182,42 @@ export class DecisionTableService {
     tables.set(id, table);
     evaluationLogs.set(id, []);
     testCases.set(id, []);
+    await syncTableToDb(table);
 
     return table;
   }
 
   async getTable(id: string): Promise<DecisionTable | null> {
-    return tables.get(id) || null;
+    const cached = tables.get(id);
+    if (cached) return cached;
+
+    // Fallback: load from Prisma
+    try {
+      const record = await prisma.decisionTable.findUnique({ where: { id } });
+      if (!record) return null;
+      const table = dbRecordToTable(record);
+      tables.set(id, table);
+      return table;
+    } catch {
+      return null;
+    }
   }
 
   async getTableBySlug(slug: string): Promise<DecisionTable | null> {
     for (const table of tables.values()) {
       if (table.slug === slug) return table;
     }
-    return null;
+
+    // Fallback: load from Prisma
+    try {
+      const records = await prisma.decisionTable.findMany({ where: { slug } as any });
+      if (records.length === 0) return null;
+      const table = dbRecordToTable(records[0]);
+      tables.set(table.id, table);
+      return table;
+    } catch {
+      return null;
+    }
   }
 
   async listTables(options: {
@@ -106,7 +226,32 @@ export class DecisionTableService {
     page?: number;
     pageSize?: number;
   } = {}): Promise<{ tables: DecisionTable[]; total: number }> {
-    let items = Array.from(tables.values());
+    // Merge in-memory with DB
+    const memItems = Array.from(tables.values());
+    const seenIds = new Set(memItems.map(t => t.id));
+
+    try {
+      const where: any = {};
+      if (options.status) where.status = statusToDb(options.status);
+      if (options.search) {
+        where.OR = [
+          { name: { contains: options.search, mode: 'insensitive' } },
+          { description: { contains: options.search, mode: 'insensitive' } },
+        ];
+      }
+      const dbRecords = await prisma.decisionTable.findMany({ where, orderBy: { updatedAt: 'desc' } });
+      for (const r of dbRecords) {
+        if (!seenIds.has(r.id)) {
+          const t = dbRecordToTable(r);
+          memItems.push(t);
+          tables.set(r.id, t); // cache
+        }
+      }
+    } catch {
+      // DB unavailable — use what's in memory
+    }
+
+    let items = memItems;
 
     if (options.status) {
       items = items.filter(t => t.status === options.status);
@@ -148,13 +293,16 @@ export class DecisionTableService {
 
     table.updatedAt = new Date();
     tables.set(id, table);
+    await syncTableToDb(table);
     return table;
   }
 
   async deleteTable(id: string): Promise<boolean> {
     evaluationLogs.delete(id);
     testCases.delete(id);
-    return tables.delete(id);
+    const deleted = tables.delete(id);
+    try { await prisma.decisionTable.delete({ where: { id } }); } catch { }
+    return deleted;
   }
 
   async publishTable(id: string, publishedBy: string): Promise<DecisionTable | null> {
@@ -174,6 +322,7 @@ export class DecisionTableService {
     table.updatedAt = new Date();
 
     tables.set(id, table);
+    await syncTableToDb(table);
     return table;
   }
 
@@ -184,6 +333,7 @@ export class DecisionTableService {
     table.status = 'draft';
     table.updatedAt = new Date();
     tables.set(id, table);
+    await syncTableToDb(table);
     return table;
   }
 
@@ -236,6 +386,7 @@ export class DecisionTableService {
     table.inputs.push(newInput);
     table.updatedAt = new Date();
     tables.set(tableId, table);
+    await syncTableToDb(table);
     return newInput;
   }
 
@@ -253,6 +404,7 @@ export class DecisionTableService {
     Object.assign(input, updates);
     table.updatedAt = new Date();
     tables.set(tableId, table);
+    await syncTableToDb(table);
     return input;
   }
 
@@ -272,6 +424,7 @@ export class DecisionTableService {
 
     table.updatedAt = new Date();
     tables.set(tableId, table);
+    await syncTableToDb(table);
     return true;
   }
 
@@ -291,6 +444,7 @@ export class DecisionTableService {
     table.outputs.push(newOutput);
     table.updatedAt = new Date();
     tables.set(tableId, table);
+    await syncTableToDb(table);
     return newOutput;
   }
 
@@ -308,6 +462,7 @@ export class DecisionTableService {
     Object.assign(output, updates);
     table.updatedAt = new Date();
     tables.set(tableId, table);
+    await syncTableToDb(table);
     return output;
   }
 
@@ -327,6 +482,7 @@ export class DecisionTableService {
 
     table.updatedAt = new Date();
     tables.set(tableId, table);
+    await syncTableToDb(table);
     return true;
   }
 
@@ -347,6 +503,7 @@ export class DecisionTableService {
     table.rules.push(newRule);
     table.updatedAt = new Date();
     tables.set(tableId, table);
+    await syncTableToDb(table);
     return newRule;
   }
 
@@ -364,6 +521,7 @@ export class DecisionTableService {
     Object.assign(rule, updates);
     table.updatedAt = new Date();
     tables.set(tableId, table);
+    await syncTableToDb(table);
     return rule;
   }
 
@@ -377,6 +535,7 @@ export class DecisionTableService {
     table.rules.splice(index, 1);
     table.updatedAt = new Date();
     tables.set(tableId, table);
+    await syncTableToDb(table);
     return true;
   }
 
@@ -388,6 +547,7 @@ export class DecisionTableService {
     table.rules = ruleIds.map(id => ruleMap.get(id)).filter(Boolean) as DecisionRule[];
     table.updatedAt = new Date();
     tables.set(tableId, table);
+    await syncTableToDb(table);
     return true;
   }
 
@@ -406,6 +566,7 @@ export class DecisionTableService {
     rule.inputEntries[inputId] = { condition };
     table.updatedAt = new Date();
     tables.set(tableId, table);
+    await syncTableToDb(table);
     return rule;
   }
 
@@ -425,6 +586,7 @@ export class DecisionTableService {
     rule.outputEntries[outputId] = { value, expression };
     table.updatedAt = new Date();
     tables.set(tableId, table);
+    await syncTableToDb(table);
     return rule;
   }
 
@@ -452,6 +614,8 @@ export class DecisionTableService {
     table.lastEvaluatedAt = new Date();
     table.evaluationCount++;
     tables.set(tableId, table);
+    // Fire-and-forget sync to persist evaluation stats
+    syncTableToDb(table).catch(() => { });
 
     // Log evaluation
     if (table.settings.logEvaluations) {
@@ -476,6 +640,22 @@ export class DecisionTableService {
       if (logs.length > 1000) logs.shift();
       evaluationLogs.set(tableId, logs);
     }
+
+    // Audit: log evaluation event
+    auditService.log({
+      action: 'decision_table.evaluated',
+      resource: 'decision_table',
+      resourceId: tableId,
+      userId: options.userId,
+      newData: {
+        tableName: table.name,
+        version: table.version,
+        matchedRules: result.matchedRules.length,
+        success: result.success,
+        durationMs: result.durationMs,
+        source: options.source,
+      },
+    }).catch(() => { });
 
     return result;
   }
@@ -660,6 +840,119 @@ export class DecisionTableService {
     }
 
     return (await this.getTable(table.id))!;
+  }
+  // ============================================================================
+  // DRD — Decision Requirements Diagrams
+  // ============================================================================
+
+  async createDRD(input: { name: string; description?: string; createdBy?: string }): Promise<DRDDiagram> {
+    const diagram: DRDDiagram = {
+      id: randomUUID(),
+      name: input.name,
+      description: input.description,
+      nodes: [],
+      edges: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      createdBy: input.createdBy,
+    };
+    drdDiagrams.set(diagram.id, diagram);
+    return diagram;
+  }
+
+  async getDRD(id: string): Promise<DRDDiagram | null> {
+    return drdDiagrams.get(id) || null;
+  }
+
+  async listDRDs(): Promise<DRDDiagram[]> {
+    return Array.from(drdDiagrams.values()).sort(
+      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
+    );
+  }
+
+  async updateDRD(
+    id: string,
+    updates: { name?: string; description?: string; nodes?: DRDNode[]; edges?: DRDEdge[] }
+  ): Promise<DRDDiagram | null> {
+    const diagram = drdDiagrams.get(id);
+    if (!diagram) return null;
+
+    if (updates.name !== undefined) diagram.name = updates.name;
+    if (updates.description !== undefined) diagram.description = updates.description;
+    if (updates.nodes !== undefined) diagram.nodes = updates.nodes;
+    if (updates.edges !== undefined) diagram.edges = updates.edges;
+    diagram.updatedAt = new Date();
+
+    drdDiagrams.set(id, diagram);
+    return diagram;
+  }
+
+  async deleteDRD(id: string): Promise<boolean> {
+    return drdDiagrams.delete(id);
+  }
+
+  async addDRDNode(diagramId: string, node: Omit<DRDNode, 'id'>): Promise<DRDNode | null> {
+    const diagram = drdDiagrams.get(diagramId);
+    if (!diagram) return null;
+
+    const newNode: DRDNode = { ...node, id: randomUUID() };
+    diagram.nodes.push(newNode);
+    diagram.updatedAt = new Date();
+    return newNode;
+  }
+
+  async updateDRDNode(
+    diagramId: string,
+    nodeId: string,
+    updates: Partial<Omit<DRDNode, 'id'>>
+  ): Promise<DRDNode | null> {
+    const diagram = drdDiagrams.get(diagramId);
+    if (!diagram) return null;
+
+    const node = diagram.nodes.find(n => n.id === nodeId);
+    if (!node) return null;
+
+    Object.assign(node, updates);
+    diagram.updatedAt = new Date();
+    return node;
+  }
+
+  async removeDRDNode(diagramId: string, nodeId: string): Promise<boolean> {
+    const diagram = drdDiagrams.get(diagramId);
+    if (!diagram) return false;
+
+    const idx = diagram.nodes.findIndex(n => n.id === nodeId);
+    if (idx === -1) return false;
+
+    diagram.nodes.splice(idx, 1);
+    // Also remove connected edges
+    diagram.edges = diagram.edges.filter(
+      e => e.sourceNodeId !== nodeId && e.targetNodeId !== nodeId
+    );
+    diagram.updatedAt = new Date();
+    return true;
+  }
+
+  async addDRDEdge(diagramId: string, edge: Omit<DRDEdge, 'id'>): Promise<DRDEdge | null> {
+    const diagram = drdDiagrams.get(diagramId);
+    if (!diagram) return null;
+
+    const newEdge: DRDEdge = { ...edge, id: randomUUID() };
+    diagram.edges.push(newEdge);
+    diagram.updatedAt = new Date();
+    return newEdge;
+  }
+
+  async removeDRDEdge(diagramId: string, edgeId: string): Promise<boolean> {
+    const diagram = drdDiagrams.get(diagramId);
+    if (!diagram) return false;
+
+    const idx = diagram.edges.findIndex(e => e.id === edgeId);
+    if (idx === -1) return false;
+
+    diagram.edges.splice(idx, 1);
+    diagram.updatedAt = new Date();
+    return true;
   }
 }
 

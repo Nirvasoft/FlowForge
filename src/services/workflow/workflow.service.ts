@@ -19,14 +19,87 @@ import type {
 } from '../../types/workflow';
 import { WorkflowEngine, workflowEngine } from './engine';
 import { prisma } from '../../utils/prisma.js';
+import { auditService } from '../audit/audit.service';
 
 // ============================================================================
-// In-Memory Storage (Replace with Prisma in production)
+// In-Memory Storage (acts as a cache; Prisma is the fallback source of truth)
 // ============================================================================
 
 const workflows = new Map<string, Workflow>();
 const executions = new Map<string, WorkflowExecution>();
 const tasks = new Map<string, HumanTask>();
+
+// ============================================================================
+// DB → In-Memory Conversion Helpers
+// ============================================================================
+
+function dbProcessToWorkflow(process: any): Workflow {
+  const definition = process.definition as any || {};
+  return {
+    id: process.id,
+    name: process.name,
+    slug: process.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+    description: process.description || undefined,
+    version: process.version,
+    status: (process.status?.toLowerCase() as any) || 'draft',
+    nodes: Array.isArray(definition.nodes) ? definition.nodes : [],
+    edges: Array.isArray(definition.edges) ? definition.edges : [],
+    triggers: definition.triggers || [],
+    variables: definition.variables || [],
+    settings: {
+      timeout: 3600,
+      retryPolicy: { enabled: true, maxAttempts: 3, backoffType: 'exponential' as const, initialDelay: 1000, maxDelay: 60000 },
+      errorHandling: 'stop' as const,
+      logging: 'standard' as const,
+      concurrency: 10,
+      priority: 'normal' as const,
+    },
+    createdAt: process.createdAt,
+    updatedAt: process.updatedAt,
+    createdBy: process.createdBy || 'system',
+  };
+}
+
+function dbInstanceToExecution(inst: any): WorkflowExecution {
+  return {
+    id: inst.id,
+    workflowId: inst.processId,
+    workflowName: inst.process?.name,
+    status: (inst.status?.toLowerCase() as any) || 'running',
+    currentNodes: (inst.currentNodes as string[]) || [],
+    completedNodes: [],
+    variables: (inst.variables as Record<string, unknown>) || {},
+    nodeStates: {},
+    startedAt: inst.startedAt,
+    completedAt: inst.completedAt || undefined,
+    triggeredBy: inst.startedBy,
+  } as unknown as WorkflowExecution;
+}
+
+function dbTaskToHumanTask(t: any): HumanTask {
+  return {
+    id: t.id,
+    executionId: t.instanceId,
+    nodeId: t.nodeId,
+    workflowId: t.instance?.processId || '',
+    type: (t.taskType || 'task').toLowerCase() as any,
+    status: (t.status || 'pending').toLowerCase() as any,
+    assignees: t.candidateUsers?.length ? t.candidateUsers : (t.assigneeId ? [t.assigneeId] : []),
+    claimedBy: t.status === 'CLAIMED' ? t.assigneeId : undefined,
+    title: t.name,
+    description: t.description || undefined,
+    formData: (t.formData as Record<string, unknown>) || undefined,
+    createdAt: t.createdAt,
+    dueDate: t.dueAt || undefined,
+    completedAt: t.completedAt || undefined,
+    outcome: t.outcome || undefined,
+    comments: t.comments || undefined,
+    escalationLevel: 0,
+    history: [{ timestamp: t.createdAt, action: 'created' }],
+    // Add extra fields the frontend may use
+    workflowName: t.instance?.process?.name,
+  } as any;
+}
 
 // ============================================================================
 // Default Settings
@@ -46,6 +119,52 @@ const DEFAULT_SETTINGS: WorkflowSettings = {
   concurrency: 10,
   priority: 'normal',
 };
+
+const DEFAULT_ACCOUNT_ID = '56dc14cc-16f6-45ef-9797-c77a648ed6f2';
+const DEFAULT_USER_ID = '30620aae-f229-40f0-8f3d-31704087fed4';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUUID = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v);
+
+function statusToDb(s: string): 'DRAFT' | 'ACTIVE' | 'DEPRECATED' | 'ARCHIVED' {
+  const map: Record<string, 'DRAFT' | 'ACTIVE' | 'DEPRECATED' | 'ARCHIVED'> = {
+    draft: 'DRAFT', published: 'ACTIVE', active: 'ACTIVE', deprecated: 'DEPRECATED', archived: 'ARCHIVED',
+  };
+  return map[s?.toLowerCase()] || 'DRAFT';
+}
+
+async function syncWorkflowToDb(wf: Workflow): Promise<void> {
+  try {
+    await prisma.process.upsert({
+      where: { id: wf.id },
+      update: {
+        name: wf.name,
+        description: wf.description || null,
+        definition: { nodes: wf.nodes, edges: wf.edges } as any,
+        triggers: (wf.triggers || []) as any,
+        variables: (wf.variables || []) as any,
+        settings: (wf.settings || {}) as any,
+        version: wf.version || 1,
+        status: statusToDb(wf.status),
+        publishedAt: wf.publishedAt || null,
+      },
+      create: {
+        id: wf.id,
+        accountId: DEFAULT_ACCOUNT_ID,
+        name: wf.name,
+        description: wf.description || null,
+        definition: { nodes: wf.nodes, edges: wf.edges } as any,
+        triggers: (wf.triggers || []) as any,
+        variables: (wf.variables || []) as any,
+        settings: (wf.settings || {}) as any,
+        version: wf.version || 1,
+        status: statusToDb(wf.status),
+        createdBy: isUUID(wf.createdBy) ? wf.createdBy : DEFAULT_USER_ID,
+      },
+    });
+  } catch (e) {
+    console.warn('syncWorkflowToDb failed:', (e as Error).message);
+  }
+}
 
 // ============================================================================
 // Workflow Service
@@ -110,11 +229,24 @@ export class WorkflowService {
     });
 
     workflows.set(id, workflow);
+    await syncWorkflowToDb(workflow);
     return workflow;
   }
 
   async getWorkflow(id: string): Promise<Workflow | null> {
-    return workflows.get(id) || null;
+    const cached = workflows.get(id);
+    if (cached) return cached;
+
+    // Fallback: load from Prisma
+    try {
+      const process = await prisma.process.findUnique({ where: { id } });
+      if (!process) return null;
+      const wf = dbProcessToWorkflow(process);
+      workflows.set(id, wf);
+      return wf;
+    } catch {
+      return null;
+    }
   }
 
   async getWorkflowBySlug(slug: string): Promise<Workflow | null> {
@@ -130,7 +262,33 @@ export class WorkflowService {
     page?: number;
     pageSize?: number;
   } = {}): Promise<{ workflows: Workflow[]; total: number }> {
-    let items = Array.from(workflows.values());
+    // Merge in-memory workflows with DB workflows
+    const memItems = Array.from(workflows.values());
+    const seenIds = new Set(memItems.map(w => w.id));
+
+    // Load DB workflows that aren't already in memory
+    try {
+      const where: any = {};
+      if (options.status) where.status = options.status.toUpperCase();
+      if (options.search) {
+        where.OR = [
+          { name: { contains: options.search, mode: 'insensitive' } },
+          { description: { contains: options.search, mode: 'insensitive' } },
+        ];
+      }
+      const dbProcesses = await prisma.process.findMany({ where, orderBy: { updatedAt: 'desc' } });
+      for (const p of dbProcesses) {
+        if (!seenIds.has(p.id)) {
+          const wf = dbProcessToWorkflow(p);
+          memItems.push(wf);
+          workflows.set(p.id, wf); // cache
+        }
+      }
+    } catch {
+      // DB unavailable — use what's in memory
+    }
+
+    let items = memItems;
 
     if (options.status) {
       items = items.filter(w => w.status === options.status);
@@ -176,12 +334,15 @@ export class WorkflowService {
 
     workflow.updatedAt = new Date();
     workflows.set(id, workflow);
+    await syncWorkflowToDb(workflow);
 
     return workflow;
   }
 
   async deleteWorkflow(id: string): Promise<boolean> {
-    return workflows.delete(id);
+    const deleted = workflows.delete(id);
+    try { await prisma.process.delete({ where: { id } }); } catch { }
+    return deleted;
   }
 
   // ============================================================================
@@ -200,6 +361,7 @@ export class WorkflowService {
     workflow.nodes.push(newNode);
     workflow.updatedAt = new Date();
     workflows.set(workflowId, workflow);
+    await syncWorkflowToDb(workflow);
 
     return newNode;
   }
@@ -218,6 +380,7 @@ export class WorkflowService {
     Object.assign(node, updates);
     workflow.updatedAt = new Date();
     workflows.set(workflowId, workflow);
+    await syncWorkflowToDb(workflow);
 
     return node;
   }
@@ -237,6 +400,7 @@ export class WorkflowService {
 
     workflow.updatedAt = new Date();
     workflows.set(workflowId, workflow);
+    await syncWorkflowToDb(workflow);
 
     return true;
   }
@@ -262,6 +426,7 @@ export class WorkflowService {
     workflow.edges.push(newEdge);
     workflow.updatedAt = new Date();
     workflows.set(workflowId, workflow);
+    await syncWorkflowToDb(workflow);
 
     return newEdge;
   }
@@ -280,6 +445,7 @@ export class WorkflowService {
     Object.assign(edge, updates);
     workflow.updatedAt = new Date();
     workflows.set(workflowId, workflow);
+    await syncWorkflowToDb(workflow);
 
     return edge;
   }
@@ -294,6 +460,7 @@ export class WorkflowService {
     workflow.edges.splice(index, 1);
     workflow.updatedAt = new Date();
     workflows.set(workflowId, workflow);
+    await syncWorkflowToDb(workflow);
 
     return true;
   }
@@ -317,6 +484,7 @@ export class WorkflowService {
     workflow.triggers.push(newTrigger);
     workflow.updatedAt = new Date();
     workflows.set(workflowId, workflow);
+    await syncWorkflowToDb(workflow);
 
     return newTrigger;
   }
@@ -335,6 +503,7 @@ export class WorkflowService {
     Object.assign(trigger, updates);
     workflow.updatedAt = new Date();
     workflows.set(workflowId, workflow);
+    await syncWorkflowToDb(workflow);
 
     return trigger;
   }
@@ -349,6 +518,7 @@ export class WorkflowService {
     workflow.triggers.splice(index, 1);
     workflow.updatedAt = new Date();
     workflows.set(workflowId, workflow);
+    await syncWorkflowToDb(workflow);
 
     return true;
   }
@@ -364,6 +534,7 @@ export class WorkflowService {
     workflow.variables = variables;
     workflow.updatedAt = new Date();
     workflows.set(workflowId, workflow);
+    await syncWorkflowToDb(workflow);
 
     return true;
   }
@@ -389,6 +560,7 @@ export class WorkflowService {
     workflow.updatedAt = new Date();
 
     workflows.set(workflowId, workflow);
+    await syncWorkflowToDb(workflow);
 
     return workflow;
   }
@@ -400,6 +572,7 @@ export class WorkflowService {
     workflow.status = 'draft';
     workflow.updatedAt = new Date();
     workflows.set(workflowId, workflow);
+    await syncWorkflowToDb(workflow);
 
     return workflow;
   }
@@ -411,6 +584,7 @@ export class WorkflowService {
     workflow.status = 'archived';
     workflow.updatedAt = new Date();
     workflows.set(workflowId, workflow);
+    await syncWorkflowToDb(workflow);
 
     return workflow;
   }
@@ -533,11 +707,67 @@ export class WorkflowService {
 
     executions.set(execution.id, execution);
 
+    // Persist to DB so it survives server restarts
+    try {
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const isUUID = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v);
+      await prisma.processInstance.create({
+        data: {
+          id: execution.id,
+          processId: workflowId,
+          processVersion: workflow.version || 1,
+          status: (execution.status || 'running').toUpperCase() === 'WAITING' ? 'RUNNING' : (execution.status || 'running').toUpperCase() as any,
+          currentNodes: execution.currentNodes || [],
+          variables: (execution.variables || {}) as any,
+          startedAt: execution.startedAt || new Date(),
+          startedBy: isUUID(triggeredBy) ? triggeredBy : (isUUID(workflow.createdBy) ? workflow.createdBy : undefined as any),
+        },
+      });
+    } catch (e) {
+      console.warn('Could not persist execution to DB:', (e as Error).message);
+    }
+
+    // Audit: log execution event
+    const auditAction = execution.status === 'failed'
+      ? 'workflow.execution.failed'
+      : execution.status === 'completed'
+        ? 'workflow.execution.completed'
+        : 'workflow.execution.started';
+
+    auditService.log({
+      action: auditAction,
+      resource: 'workflow',
+      resourceId: workflowId,
+      userId: isUUID(triggeredBy) ? triggeredBy : undefined,
+      newData: {
+        executionId: execution.id,
+        workflowName: workflow.name,
+        status: execution.status,
+        triggerType,
+        nodeCount: workflow.nodes.length,
+      },
+    }).catch(() => { });
+
     return execution;
   }
 
   async getExecution(id: string): Promise<WorkflowExecution | null> {
-    return executions.get(id) || null;
+    const cached = executions.get(id);
+    if (cached) return cached;
+
+    // Fallback: load from Prisma
+    try {
+      const inst = await prisma.processInstance.findUnique({
+        where: { id },
+        include: { process: { select: { name: true } } },
+      });
+      if (!inst) return null;
+      const exec = dbInstanceToExecution(inst);
+      executions.set(id, exec);
+      return exec;
+    } catch {
+      return null;
+    }
   }
 
   async listExecutions(options: {
@@ -546,7 +776,30 @@ export class WorkflowService {
     page?: number;
     pageSize?: number;
   } = {}): Promise<{ executions: WorkflowExecution[]; total: number }> {
-    let items = Array.from(executions.values());
+    // Merge in-memory with DB
+    const memItems = Array.from(executions.values());
+    const seenIds = new Set(memItems.map(e => e.id));
+
+    try {
+      const where: any = {};
+      if (options.workflowId) where.processId = options.workflowId;
+      if (options.status) where.status = options.status.toUpperCase();
+      const dbInstances = await prisma.processInstance.findMany({
+        where,
+        orderBy: { startedAt: 'desc' },
+        take: 100,
+        include: { process: { select: { name: true } } },
+      });
+      for (const inst of dbInstances) {
+        if (!seenIds.has(inst.id)) {
+          memItems.push(dbInstanceToExecution(inst));
+        }
+      }
+    } catch {
+      // DB unavailable
+    }
+
+    let items = memItems;
 
     if (options.workflowId) {
       items = items.filter(e => e.workflowId === options.workflowId);
@@ -615,28 +868,43 @@ export class WorkflowService {
   }
 
   async pauseExecution(id: string): Promise<WorkflowExecution | null> {
+    // Try in-memory first
     const execution = executions.get(id);
-    if (!execution) return null;
-
-    if (execution.status !== 'running') {
-      throw new Error('Can only pause running executions');
+    if (execution) {
+      if (execution.status !== 'running') {
+        throw new Error('Can only pause running executions');
+      }
+      execution.status = 'paused';
+      executions.set(id, execution);
+      // Also update DB
+      try { await prisma.processInstance.update({ where: { id }, data: { status: 'SUSPENDED' } }); } catch { }
+      return execution;
     }
 
-    execution.status = 'paused';
-    executions.set(id, execution);
-
-    return execution;
+    // Fallback: update in Prisma
+    const inst = await prisma.processInstance.findUnique({ where: { id } });
+    if (!inst) return null;
+    if (inst.status !== 'RUNNING') throw new Error('Can only pause running executions');
+    const updated = await prisma.processInstance.update({ where: { id }, data: { status: 'SUSPENDED' } });
+    return dbInstanceToExecution(updated);
   }
 
   async resumeExecution(
     id: string,
     resumeData?: Record<string, unknown>
   ): Promise<WorkflowExecution | null> {
-    const execution = executions.get(id);
-    if (!execution) return null;
+    // Try in-memory first, fall back to DB
+    let execution = executions.get(id);
+    if (!execution) {
+      execution = await this.getExecution(id) || undefined as any;
+      if (!execution) return null;
+    }
 
-    const workflow = workflows.get(execution.workflowId);
-    if (!workflow) return null;
+    let workflow = workflows.get(execution.workflowId);
+    if (!workflow) {
+      workflow = await this.getWorkflow(execution.workflowId) || undefined as any;
+      if (!workflow) return null;
+    }
 
     const resumed = await this.engine.resumeExecution(execution, workflow, resumeData, {
       onTaskCreated: (task) => {
@@ -647,6 +915,21 @@ export class WorkflowService {
       },
     });
     executions.set(id, resumed);
+
+    // Persist execution state to DB
+    try {
+      await prisma.processInstance.update({
+        where: { id },
+        data: {
+          status: (resumed.status || 'running').toUpperCase() as any,
+          currentNodes: resumed.currentNodes || [],
+          variables: (resumed.variables || {}) as any,
+          completedAt: resumed.completedAt || null,
+        },
+      });
+    } catch (e) {
+      console.warn('Could not persist resumed execution to DB:', (e as Error).message);
+    }
 
     return resumed;
   }
@@ -690,11 +973,49 @@ export class WorkflowService {
 
     tasks.set(task.id, task);
 
+    // Also persist to DB
+    try {
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const isUUID = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v);
+      await prisma.taskInstance.create({
+        data: {
+          id: task.id,
+          instanceId: input.executionId,
+          nodeId: input.nodeId,
+          name: input.title,
+          description: input.description || null,
+          taskType: (input.type || 'TASK').toUpperCase() as any,
+          assigneeId: isUUID(input.assignees[0]) ? input.assignees[0] : undefined,
+          candidateUsers: input.assignees.filter(a => isUUID(a)),
+          formData: (input.formData || {}) as any,
+          status: 'PENDING',
+          dueAt: input.dueDate || null,
+        },
+      });
+    } catch (e) {
+      console.warn('Could not persist task to DB:', (e as Error).message);
+    }
+
     return task;
   }
 
   async getTask(id: string): Promise<HumanTask | null> {
-    return tasks.get(id) || null;
+    const cached = tasks.get(id);
+    if (cached) return cached;
+
+    // Fallback: load from Prisma
+    try {
+      const t = await prisma.taskInstance.findUnique({
+        where: { id },
+        include: { instance: { select: { processId: true, process: { select: { name: true } } } } },
+      });
+      if (!t) return null;
+      const ht = dbTaskToHumanTask(t);
+      tasks.set(id, ht);
+      return ht;
+    } catch {
+      return null;
+    }
   }
 
   async listTasks(options: {
@@ -704,7 +1025,32 @@ export class WorkflowService {
     page?: number;
     pageSize?: number;
   } = {}): Promise<{ tasks: HumanTask[]; total: number }> {
-    let items = Array.from(tasks.values());
+    // Merge in-memory with DB
+    const memItems = Array.from(tasks.values());
+    const seenIds = new Set(memItems.map(t => t.id));
+
+    try {
+      const where: any = {};
+      if (options.assigneeId) where.assigneeId = options.assigneeId;
+      if (options.status) where.status = (options.status as string).toUpperCase();
+      const dbTasks = await prisma.taskInstance.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        include: { instance: { select: { processId: true, process: { select: { name: true } } } } },
+      });
+      for (const t of dbTasks) {
+        if (!seenIds.has(t.id)) {
+          const ht = dbTaskToHumanTask(t);
+          memItems.push(ht);
+          tasks.set(t.id, ht); // cache
+        }
+      }
+    } catch {
+      // DB unavailable
+    }
+
+    let items = memItems;
 
     if (options.assigneeId) {
       items = items.filter(t =>
@@ -742,8 +1088,12 @@ export class WorkflowService {
   }
 
   async claimTask(taskId: string, userId: string): Promise<HumanTask | null> {
-    const task = tasks.get(taskId);
-    if (!task) return null;
+    let task = tasks.get(taskId);
+    if (!task) {
+      // Try loading from DB
+      task = await this.getTask(taskId) || undefined as any;
+      if (!task) return null;
+    }
 
     if (task.status !== 'pending') {
       throw new Error('Can only claim pending tasks');
@@ -764,12 +1114,18 @@ export class WorkflowService {
 
     tasks.set(taskId, task);
 
+    // Persist to DB
+    try { await prisma.taskInstance.update({ where: { id: taskId }, data: { status: 'CLAIMED', assigneeId: userId } }); } catch { }
+
     return task;
   }
 
   async releaseTask(taskId: string, userId: string): Promise<HumanTask | null> {
-    const task = tasks.get(taskId);
-    if (!task) return null;
+    let task = tasks.get(taskId);
+    if (!task) {
+      task = await this.getTask(taskId) || undefined as any;
+      if (!task) return null;
+    }
 
     if (task.claimedBy !== userId) {
       throw new Error('Task is not claimed by this user');
@@ -786,6 +1142,9 @@ export class WorkflowService {
 
     tasks.set(taskId, task);
 
+    // Persist to DB
+    try { await prisma.taskInstance.update({ where: { id: taskId }, data: { status: 'PENDING' } }); } catch { }
+
     return task;
   }
 
@@ -796,8 +1155,12 @@ export class WorkflowService {
     responseData?: Record<string, unknown>,
     comments?: string
   ): Promise<HumanTask | null> {
-    const task = tasks.get(taskId);
-    if (!task) return null;
+    let task = tasks.get(taskId);
+    if (!task) {
+      // Try loading from DB
+      task = await this.getTask(taskId) || undefined as any;
+      if (!task) return null;
+    }
 
     if (task.status !== 'claimed' && task.status !== 'pending') {
       throw new Error('Task is not in a completable state');
@@ -817,10 +1180,29 @@ export class WorkflowService {
 
     tasks.set(taskId, task);
 
-    // Resume workflow execution
-    const execution = executions.get(task.executionId);
-    if (execution && execution.status === 'waiting') {
-      const workflow = workflows.get(execution.workflowId);
+    // Persist to DB
+    try {
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const isUUID = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v);
+      await prisma.taskInstance.update({
+        where: { id: taskId },
+        data: {
+          status: 'COMPLETED',
+          outcome,
+          comments: comments || null,
+          completedAt: new Date(),
+          completedBy: isUUID(userId) ? userId : undefined,
+        },
+      });
+    } catch { }
+
+    // Resume workflow execution (loads from DB if not in memory)
+    let execution = executions.get(task.executionId);
+    if (!execution) {
+      execution = await this.getExecution(task.executionId) || undefined as any;
+    }
+    if (execution && (execution.status === 'waiting' || execution.status === 'running' || execution.status === 'paused')) {
+      const workflow = await this.getWorkflow(execution.workflowId);
       if (workflow) {
         // Add task result to variables
         const resumeData = {
@@ -839,8 +1221,11 @@ export class WorkflowService {
     fromUserId: string,
     toUserId: string
   ): Promise<HumanTask | null> {
-    const task = tasks.get(taskId);
-    if (!task) return null;
+    let task = tasks.get(taskId);
+    if (!task) {
+      task = await this.getTask(taskId) || undefined as any;
+      if (!task) return null;
+    }
 
     task.assignees = task.assignees.filter(id => id !== fromUserId);
     task.assignees.push(toUserId);
@@ -859,6 +1244,19 @@ export class WorkflowService {
     });
 
     tasks.set(taskId, task);
+
+    // Persist to DB
+    try {
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const isUUID = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v);
+      await prisma.taskInstance.update({
+        where: { id: taskId },
+        data: {
+          status: task.status === 'pending' ? 'PENDING' : (task.status as string).toUpperCase() as any,
+          assigneeId: isUUID(toUserId) ? toUserId : undefined,
+        },
+      });
+    } catch { }
 
     return task;
   }

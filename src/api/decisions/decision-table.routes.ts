@@ -357,4 +357,42 @@ export async function decisionTableRoutes(fastify: FastifyInstance) {
     }
     return { success: true };
   });
+
+  // ============================================================================
+  // DRD — Decision Requirements Diagrams
+  // ============================================================================
+
+  // List DRDs
+  fastify.get('/drds', async () => {
+    const diagrams = await service.listDRDs();
+    return { diagrams };
+  });
+
+  // Create DRD
+  fastify.post<{ Body: { name: string; description?: string } }>('/drds', async (request, reply) => {
+    const diagram = await service.createDRD({ ...request.body, createdBy: 'user-1' });
+    return reply.status(201).send(diagram);
+  });
+
+  // Get DRD
+  fastify.get<{ Params: { drdId: string } }>('/drds/:drdId', async (request, reply) => {
+    const diagram = await service.getDRD(request.params.drdId);
+    if (!diagram) return reply.status(404).send({ error: 'DRD not found' });
+    return diagram;
+  });
+
+  // Update DRD (full save — nodes + edges + metadata)
+  fastify.put<{ Params: { drdId: string }; Body: any }>('/drds/:drdId', async (request, reply) => {
+    const diagram = await service.updateDRD(request.params.drdId, request.body as any);
+    if (!diagram) return reply.status(404).send({ error: 'DRD not found' });
+    return diagram;
+  });
+
+  // Delete DRD
+  fastify.delete<{ Params: { drdId: string } }>('/drds/:drdId', async (request, reply) => {
+    if (!await service.deleteDRD(request.params.drdId)) {
+      return reply.status(404).send({ error: 'DRD not found' });
+    }
+    return { success: true };
+  });
 }

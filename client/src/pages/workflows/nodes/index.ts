@@ -8,6 +8,7 @@ import { EndNode } from './EndNode';
 import { ActionNode } from './ActionNode';
 import { DecisionNode } from './DecisionNode';
 import { ApprovalNode } from './ApprovalNode';
+import { BusinessRuleNode } from './BusinessRuleNode';
 import type { NodeType } from '../../../types';
 
 // Node type registry for React Flow
@@ -17,6 +18,7 @@ export const nodeTypes = {
     action: ActionNode,
     decision: DecisionNode,
     approval: ApprovalNode,
+    businessRule: BusinessRuleNode,
     // Generic nodes use ActionNode as fallback
     http: ActionNode,
     email: ActionNode,
@@ -49,6 +51,7 @@ export const paletteItems: PaletteItem[] = [
 
     // Actions
     { type: 'action', label: 'Action', icon: 'zap', category: 'action', description: 'Generic action' },
+    { type: 'businessRule', label: 'Business Rule', icon: 'table-properties', category: 'action', description: 'Evaluate decision table' },
     { type: 'http', label: 'HTTP Request', icon: 'globe', category: 'action', description: 'Make HTTP call' },
     { type: 'email', label: 'Send Email', icon: 'mail', category: 'action', description: 'Send email notification' },
     { type: 'script', label: 'Script', icon: 'code', category: 'action', description: 'Execute JavaScript' },
@@ -62,4 +65,5 @@ export const paletteItems: PaletteItem[] = [
     { type: 'subworkflow', label: 'Subworkflow', icon: 'layers', category: 'data', description: 'Call another workflow' },
 ];
 
-export { StartNode, EndNode, ActionNode, DecisionNode, ApprovalNode };
+export { StartNode, EndNode, ActionNode, DecisionNode, ApprovalNode, BusinessRuleNode };
+

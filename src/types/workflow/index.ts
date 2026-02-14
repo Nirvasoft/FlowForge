@@ -14,22 +14,22 @@ export interface Workflow {
   description?: string;
   version: number;
   status: WorkflowStatus;
-  
+
   // Visual designer data
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
-  
+
   // Triggers
   triggers: WorkflowTrigger[];
-  
+
   // Variables and context
   variables: WorkflowVariable[];
   inputSchema?: JSONSchema;
   outputSchema?: JSONSchema;
-  
+
   // Settings
   settings: WorkflowSettings;
-  
+
   // Metadata
   createdAt: Date;
   updatedAt: Date;
@@ -67,20 +67,20 @@ export interface WorkflowNode {
   type: NodeType;
   name: string;
   description?: string;
-  
+
   // Position in visual designer
   position: { x: number; y: number };
-  
+
   // Node-specific configuration
   config: NodeConfig;
-  
+
   // Conditional execution
   condition?: string; // Expression that evaluates to boolean
-  
+
   // Error handling
   onError?: 'stop' | 'continue' | 'goto';
   errorTargetNodeId?: string;
-  
+
   // Metadata
   disabled?: boolean;
   notes?: string;
@@ -97,7 +97,7 @@ export type NodeType =
   | 'loop'          // Iterate over array
   | 'delay'         // Wait for duration
   | 'schedule'      // Wait until specific time
-  
+
   // Actions
   | 'action'        // Generic action
   | 'script'        // Custom JavaScript/TypeScript
@@ -107,18 +107,19 @@ export type NodeType =
   | 'database'      // Database operation
   | 'transform'     // Data transformation
   | 'validate'      // Data validation
-  
+  | 'businessRule'  // Evaluate decision table
+
   // Human tasks
   | 'approval'      // Approval request
   | 'form'          // Form submission
   | 'assignment'    // Task assignment
   | 'review'        // Review task
-  
+
   // Integrations
   | 'webhook'       // Outgoing webhook
   | 'subworkflow'   // Call another workflow
   | 'event'         // Emit/listen for events
-  
+
   // Data
   | 'setVariable'   // Set workflow variable
   | 'getData'       // Get data from dataset
@@ -144,7 +145,8 @@ export type NodeConfig =
   | SubworkflowNodeConfig
   | SetVariableNodeConfig
   | TransformNodeConfig
-  | ExpressionNodeConfig;
+  | ExpressionNodeConfig
+  | BusinessRuleNodeConfig;
 
 // ============================================================================
 // Node Configuration Types
@@ -161,7 +163,10 @@ export interface EndNodeConfig {
 
 export interface DecisionNodeConfig {
   type: 'decision';
-  condition: string; // Expression
+  mode?: 'expression' | 'table';   // default: 'expression'
+  condition: string;               // Used when mode='expression' (or default)
+  decisionTableId?: string;        // Used when mode='table'
+  branchField?: string;            // Which output field determines branching (mode='table')
   trueLabel?: string;
   falseLabel?: string;
 }
@@ -334,6 +339,14 @@ export interface ExpressionNodeConfig {
   outputVariable?: string;
 }
 
+export interface BusinessRuleNodeConfig {
+  type: 'businessRule';
+  decisionTableId: string;               // ID of the decision table to evaluate
+  inputMapping: Record<string, string>;   // table input name → expression against workflow vars
+  outputVariable: string;                 // workflow variable name to store results
+  failOnNoMatch?: boolean;                // error if no rules match (default: false)
+}
+
 // ============================================================================
 // Edge Types
 // ============================================================================
@@ -443,35 +456,35 @@ export interface WorkflowExecution {
   id: string;
   workflowId: string;
   workflowVersion: number;
-  
+
   // Status
   status: ExecutionStatus;
   startedAt: Date;
   completedAt?: Date;
-  
+
   // Context
   triggeredBy: string; // User ID or 'system'
   triggerType: TriggerType;
   triggerData?: Record<string, unknown>;
-  
+
   // Input/Output
   input: Record<string, unknown>;
   output?: Record<string, unknown>;
-  
+
   // State
   variables: Record<string, unknown>;
   currentNodes: string[]; // Active node IDs
   completedNodes: string[];
-  
+
   // Logging
   logs: ExecutionLog[];
-  
+
   // Error info
   error?: ExecutionError;
-  
+
   // Metrics
   metrics: ExecutionMetrics;
-  
+
   // Parent execution (for subworkflows)
   parentExecutionId?: string;
   parentNodeId?: string;
@@ -546,39 +559,39 @@ export interface HumanTask {
   executionId: string;
   nodeId: string;
   workflowId: string;
-  
+
   // Task type
   type: 'approval' | 'form' | 'assignment' | 'review';
-  
+
   // Status
   status: TaskStatus;
-  
+
   // Assignment
   assignees: string[]; // User IDs
   assignedRoles?: string[];
   assignedGroups?: string[];
   claimedBy?: string;
-  
+
   // Content
   title: string;
   description?: string;
   formData?: Record<string, unknown>;
-  
+
   // Timing
   createdAt: Date;
   dueDate?: Date;
   claimedAt?: Date;
   completedAt?: Date;
-  
+
   // Result
   outcome?: string; // 'approved', 'rejected', etc.
   comments?: string;
   responseData?: Record<string, unknown>;
-  
+
   // Escalation
   escalationLevel: number;
   escalatedAt?: Date;
-  
+
   // History
   history: TaskHistoryEntry[];
 }

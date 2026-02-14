@@ -10,6 +10,7 @@ import { WorkflowsPage } from './pages/workflows';
 import { WorkflowDesigner } from './pages/workflows/WorkflowDesigner';
 import { AppsPage, AppBuilder } from './pages/apps';
 import { DecisionTablesPage, DecisionTableEditor } from './pages/decision-tables';
+import { DRDDesigner } from './pages/decision-tables/DRDDesigner';
 import { IntegrationsPage } from './pages/integrations';
 import { ReportsPage } from './pages/reports';
 import { SettingsPage } from './pages/settings';
@@ -28,6 +29,8 @@ function App() {
           <Route path="/workflows/new/design" element={<WorkflowDesigner />} />
           <Route path="/apps/:id/build" element={<AppBuilder />} />
           <Route path="/decision-tables/:id/edit" element={<DecisionTableEditor />} />
+          <Route path="/decision-tables/drd/new" element={<DRDDesigner />} />
+          <Route path="/decision-tables/drd/:id" element={<DRDDesigner />} />
 
           {/* Protected routes */}
           <Route element={<AppShell />}>

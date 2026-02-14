@@ -173,7 +173,8 @@ export type NodeType =
     | 'form'
     | 'delay'
     | 'setVariable'
-    | 'subworkflow';
+    | 'subworkflow'
+    | 'businessRule';
 
 export interface WorkflowNode {
     id: string;

@@ -524,6 +524,7 @@ function WorkflowDesignerInner() {
                                     case 'end': return '#ef4444';
                                     case 'decision': return '#f59e0b';
                                     case 'approval': return '#8b5cf6';
+                                    case 'businessRule': return '#14b8a6';
                                     default: return '#6366f1';
                                 }
                             }}

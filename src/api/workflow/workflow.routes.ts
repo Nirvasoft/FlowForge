@@ -39,54 +39,8 @@ export async function workflowRoutes(fastify: FastifyInstance) {
   fastify.get('/', {
     schema: { description: 'List workflows', tags: ['Workflows'] },
   }, async (request: FastifyRequest<{ Querystring: { status?: string; search?: string; page?: number; pageSize?: number } }>, reply) => {
-    // First try the in-memory service
     const result = await service.listWorkflows(request.query as any);
-
-    // If in-memory store has workflows, return them
-    if (result.workflows.length > 0) {
-      return result;
-    }
-
-    // Fallback: also query Prisma Process table for seeded/DB-stored workflows
-    const query = request.query;
-    const page = Number(query.page) || 1;
-    const pageSize = Number(query.pageSize) || 20;
-    const where: any = {};
-    if (query.status) where.status = query.status;
-    if (query.search) {
-      where.OR = [
-        { name: { contains: query.search, mode: 'insensitive' } },
-        { description: { contains: query.search, mode: 'insensitive' } },
-      ];
-    }
-
-    const [processes, total] = await Promise.all([
-      prisma.process.findMany({
-        where,
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-        orderBy: { updatedAt: 'desc' },
-      }),
-      prisma.process.count({ where }),
-    ]);
-
-    return {
-      workflows: processes.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        status: p.status?.toLowerCase() || 'draft',
-        version: p.version,
-        nodes: [],
-        edges: [],
-        triggers: [],
-        variables: [],
-        createdAt: p.createdAt,
-        updatedAt: p.updatedAt,
-        createdBy: p.createdBy,
-      })),
-      total,
-    };
+    return result;
   });
 
   // Create workflow
@@ -106,39 +60,11 @@ export async function workflowRoutes(fastify: FastifyInstance) {
   fastify.get<{ Params: IdParams }>('/:id', {
     schema: { description: 'Get a workflow', tags: ['Workflows'] },
   }, async (request, reply) => {
-    // Try in-memory service first
     const workflow = await service.getWorkflow(request.params.id);
-    if (workflow) {
-      return workflow;
-    }
-
-    // Fallback: query Prisma Process table for seeded/DB-stored workflows
-    const process = await prisma.process.findUnique({
-      where: { id: request.params.id },
-    });
-    if (!process) {
+    if (!workflow) {
       return reply.status(404).send({ error: 'Workflow not found' });
     }
-
-    // Parse the definition JSON to extract nodes and edges
-    const definition = (process as any).definition as any || {};
-    const nodes = Array.isArray(definition.nodes) ? definition.nodes : [];
-    const edges = Array.isArray(definition.edges) ? definition.edges : [];
-
-    return {
-      id: process.id,
-      name: process.name,
-      description: process.description,
-      status: process.status?.toLowerCase() || 'draft',
-      version: process.version,
-      nodes,
-      edges,
-      triggers: definition.triggers || [],
-      variables: definition.variables || [],
-      createdAt: process.createdAt,
-      updatedAt: process.updatedAt,
-      createdBy: process.createdBy,
-    };
+    return workflow;
   });
 
   // Update workflow
@@ -437,48 +363,7 @@ export async function executionRoutes(fastify: FastifyInstance) {
     schema: { description: 'List all executions', tags: ['Executions'] },
   }, async (request: FastifyRequest<{ Querystring: { workflowId?: string; status?: string; page?: number; pageSize?: number } }>, reply) => {
     const result = await service.listExecutions(request.query as any);
-
-    // If in-memory has data, return it
-    if (result.executions && result.executions.length > 0) {
-      return result;
-    }
-
-    // Fallback: query Prisma ProcessInstance table
-    const query = request.query;
-    const page = Number(query.page) || 1;
-    const pageSize = Number(query.pageSize) || 20;
-    const where: any = {};
-    if (query.workflowId) where.processId = query.workflowId;
-    if (query.status) where.status = query.status;
-
-    const [instances, total] = await Promise.all([
-      prisma.processInstance.findMany({
-        where,
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-        orderBy: { startedAt: 'desc' },
-        include: { process: { select: { name: true } } },
-      }),
-      prisma.processInstance.count({ where }),
-    ]);
-
-    return {
-      executions: instances.map(inst => ({
-        id: inst.id,
-        workflowId: inst.processId,
-        workflowName: (inst as any).process?.name,
-        status: inst.status,
-        currentNodes: inst.currentNodes,
-        variables: inst.variables,
-        startedBy: inst.startedBy,
-        startedAt: inst.startedAt,
-        completedAt: inst.completedAt,
-        dueAt: inst.dueAt,
-      })),
-      total,
-      page,
-      pageSize,
-    };
+    return result;
   });
 
   // Get execution
@@ -551,74 +436,18 @@ export async function taskRoutes(fastify: FastifyInstance) {
   }, async (request: FastifyRequest<{ Querystring: { assigneeId?: string; status?: string; workflowId?: string; page?: number; pageSize?: number } }>, reply) => {
     const result = await service.listTasks(request.query as any);
 
-    // If in-memory has data, normalize fields for the frontend
-    if (result.tasks && result.tasks.length > 0) {
-      return {
-        ...result,
-        tasks: result.tasks.map((t: any) => ({
-          ...t,
-          // Frontend expects 'name' not 'title'
-          name: t.name || t.title || 'Untitled Task',
-          // Frontend expects uppercase type (APPROVAL, REVIEW, etc.)
-          type: (t.type || t.taskType || 'TASK').toUpperCase(),
-          taskType: (t.type || t.taskType || 'TASK').toUpperCase(),
-          // Frontend expects 'status' in uppercase
-          status: (t.status || 'PENDING').toUpperCase(),
-          // Frontend expects dueAt
-          dueAt: t.dueAt || t.dueDate || null,
-          // Add workflow name for display
-          workflowName: t.workflowName || 'Leave Request Workflow',
-        })),
-      };
-    }
-
-    // Fallback: query Prisma TaskInstance table
-    const query = request.query;
-    const page = Number(query.page) || 1;
-    const pageSize = Number(query.pageSize) || 20;
-    const where: any = {};
-    if (query.assigneeId) where.assigneeId = query.assigneeId;
-    if (query.status) where.status = query.status;
-
-    const [tasks, total] = await Promise.all([
-      prisma.taskInstance.findMany({
-        where,
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          instance: {
-            select: { process: { select: { name: true } } },
-          },
-        },
-      }),
-      prisma.taskInstance.count({ where }),
-    ]);
-
+    // Normalize fields for the frontend
     return {
-      tasks: tasks.map(task => ({
-        id: task.id,
-        instanceId: task.instanceId,
-        nodeId: task.nodeId,
-        name: task.name,
-        description: task.description,
-        taskType: task.taskType,
-        assigneeId: task.assigneeId,
-        assigneeType: task.assigneeType,
-        formData: task.formData,
-        status: task.status,
-        priority: task.priority,
-        outcome: task.outcome,
-        comments: task.comments,
-        dueAt: task.dueAt,
-        completedAt: task.completedAt,
-        completedBy: task.completedBy,
-        createdAt: task.createdAt,
-        workflowName: (task as any).instance?.process?.name,
+      ...result,
+      tasks: result.tasks.map((t: any) => ({
+        ...t,
+        name: t.name || t.title || 'Untitled Task',
+        type: (t.type || t.taskType || 'TASK').toUpperCase(),
+        taskType: (t.type || t.taskType || 'TASK').toUpperCase(),
+        status: (t.status || 'PENDING').toUpperCase(),
+        dueAt: t.dueAt || t.dueDate || null,
+        workflowName: t.workflowName || 'Workflow',
       })),
-      total,
-      page,
-      pageSize,
     };
   });
 
@@ -648,23 +477,11 @@ export async function taskRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     const userId = 'user-1';
     try {
-      // Try in-memory first
       const task = await service.claimTask(request.params.taskId, userId);
-      if (task) return task;
-
-      // Fallback: update in Prisma
-      const dbTask = await prisma.taskInstance.findUnique({ where: { id: request.params.taskId } });
-      if (!dbTask) {
+      if (!task) {
         return reply.status(404).send({ error: 'Task not found' });
       }
-      if (dbTask.status !== 'PENDING') {
-        return reply.status(400).send({ error: 'Can only claim pending tasks' });
-      }
-      const updated = await prisma.taskInstance.update({
-        where: { id: request.params.taskId },
-        data: { status: 'CLAIMED', assigneeId: dbTask.assigneeId },
-      });
-      return updated;
+      return task;
     } catch (error) {
       return reply.status(400).send({ error: (error as Error).message });
     }
@@ -677,18 +494,10 @@ export async function taskRoutes(fastify: FastifyInstance) {
     const userId = 'user-1';
     try {
       const task = await service.releaseTask(request.params.taskId, userId);
-      if (task) return task;
-
-      // Fallback: update in Prisma
-      const dbTask = await prisma.taskInstance.findUnique({ where: { id: request.params.taskId } });
-      if (!dbTask) {
+      if (!task) {
         return reply.status(404).send({ error: 'Task not found' });
       }
-      const updated = await prisma.taskInstance.update({
-        where: { id: request.params.taskId },
-        data: { status: 'PENDING' },
-      });
-      return updated;
+      return task;
     } catch (error) {
       return reply.status(400).send({ error: (error as Error).message });
     }
@@ -700,7 +509,6 @@ export async function taskRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     const userId = 'user-1';
     try {
-      // Try in-memory first
       const task = await service.completeTask(
         request.params.taskId,
         userId,
@@ -708,27 +516,10 @@ export async function taskRoutes(fastify: FastifyInstance) {
         request.body.data,
         request.body.comments
       );
-      if (task) return task;
-
-      // Fallback: update in Prisma
-      const dbTask = await prisma.taskInstance.findUnique({ where: { id: request.params.taskId } });
-      if (!dbTask) {
+      if (!task) {
         return reply.status(404).send({ error: 'Task not found' });
       }
-      if (dbTask.status === 'COMPLETED' || dbTask.status === 'CANCELLED') {
-        return reply.status(400).send({ error: 'Task is not in a completable state' });
-      }
-      const updated = await prisma.taskInstance.update({
-        where: { id: request.params.taskId },
-        data: {
-          status: 'COMPLETED',
-          outcome: request.body.outcome,
-          comments: request.body.comments,
-          completedAt: new Date(),
-          completedBy: dbTask.assigneeId,
-        },
-      });
-      return updated;
+      return task;
     } catch (error) {
       return reply.status(400).send({ error: (error as Error).message });
     }

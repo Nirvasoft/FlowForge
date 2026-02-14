@@ -26,6 +26,7 @@ import { formRoutes } from './api/forms/index.js';
 import { appRoutes, componentRoutes } from './api/apps/index.js';
 import { dashboardRoutes, reportRoutes, processAnalyticsRoutes, queryRoutes } from './api/analytics/index.js';
 import { decisionTableRoutes } from './api/decisions/decision-table.routes.js';
+import { auditRoutes } from './api/audit/audit.routes.js';
 import { seedExpenseApprovalTable, seedPOApprovalMatrix, seedTicketRoutingSLA, seedOnboardingEquipmentAccess } from './services/decisions/decision-table.service.js';
 /**
  * Build and configure Fastify server
@@ -141,6 +142,7 @@ async function buildServer() {
   await fastify.register(processAnalyticsRoutes, { prefix: '/api/v1/analytics' });
   await fastify.register(queryRoutes, { prefix: '/api/v1/query' });
   await fastify.register(decisionTableRoutes, { prefix: '/api/v1/decision-tables' });
+  await fastify.register(auditRoutes, { prefix: '/api/v1/audit' });
 
   // ---------- Serve React client when built files exist ----------
   const clientDir = path.join(process.cwd(), 'client', 'dist');

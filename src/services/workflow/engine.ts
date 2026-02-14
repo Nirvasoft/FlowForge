@@ -28,8 +28,16 @@ import type {
   FormNodeConfig,
   EmailNodeConfig,
   ActionNodeConfig,
+  BusinessRuleNodeConfig,
 } from '../../types/workflow';
 import { ExpressionService } from '../expressions/expression.service';
+import { prisma } from '../../utils/prisma.js';
+
+// Simple UUID v4 format check
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUUID(val: unknown): val is string {
+  return typeof val === 'string' && UUID_RE.test(val);
+}
 
 // ============================================================================
 // Execution Context
@@ -109,6 +117,9 @@ export class WorkflowEngine {
 
     // Integration executors
     this.nodeExecutors.set('subworkflow', new SubworkflowNodeExecutor());
+
+    // Decision table executor
+    this.nodeExecutors.set('businessRule', new BusinessRuleNodeExecutor());
 
     // Passthrough executors for types that are defined but not yet fully implemented
     // These allow workflows to continue execution without errors
@@ -534,6 +545,89 @@ class DecisionNodeExecutor implements NodeExecutor {
   async execute(node: WorkflowNode, context: ExecutionContext): Promise<NodeExecutionResult> {
     const config = node.config as DecisionNodeConfig;
     const engine = new WorkflowEngine();
+
+    // -----------------------------------------------------------------------
+    // Table-backed branching mode
+    // -----------------------------------------------------------------------
+    if (config?.mode === 'table') {
+      if (!config.decisionTableId) {
+        return {
+          status: 'failed',
+          error: 'Decision node in table mode requires a decision table ID',
+          output: {},
+        };
+      }
+
+      try {
+        // Lazy import to avoid circular dependency
+        const { decisionTableService } = await import('../decisions/decision-table.service.js');
+
+        // Pass all workflow variables as inputs to the table
+        const tableInputs: Record<string, unknown> = { ...context.variables };
+
+        const result = await decisionTableService.evaluate(
+          config.decisionTableId,
+          { inputs: tableInputs },
+          { source: `workflow:${context.execution.workflowId}:${context.execution.id}` }
+        );
+
+        // Store full result in context for downstream access
+        context.variables['_decisionResult'] = result.outputs;
+
+        // Determine the branch value from outputs
+        let branchValue: unknown;
+        if (config.branchField && result.outputs && typeof result.outputs === 'object' && !Array.isArray(result.outputs)) {
+          branchValue = (result.outputs as Record<string, unknown>)[config.branchField];
+        } else if (result.outputs && typeof result.outputs === 'object' && !Array.isArray(result.outputs)) {
+          // Fallback: use the first boolean-valued output
+          for (const [, val] of Object.entries(result.outputs as Record<string, unknown>)) {
+            if (typeof val === 'boolean') {
+              branchValue = val;
+              break;
+            }
+          }
+          // If no boolean found, use truthiness of first output
+          if (branchValue === undefined) {
+            const firstVal = Object.values(result.outputs as Record<string, unknown>)[0];
+            branchValue = firstVal;
+          }
+        }
+
+        // Route using the same true/false edge logic as expression mode
+        const isTruthy = Boolean(branchValue);
+
+        const edges = context.workflow.edges.filter(e => e.source === node.id);
+        const trueEdge = edges.find(e =>
+          e.sourceHandle === 'true' || e.sourceHandle === 'yes'
+        );
+        const falseEdge = edges.find(e =>
+          e.sourceHandle === 'false' || e.sourceHandle === 'no'
+        );
+
+        let nextNodes: string[];
+        if (isTruthy) {
+          nextNodes = trueEdge ? [trueEdge.target] : (edges[0] ? [edges[0].target] : []);
+        } else {
+          nextNodes = falseEdge ? [falseEdge.target] : (edges[1] ? [edges[1].target] : []);
+        }
+
+        return {
+          status: 'completed',
+          output: { _decision: isTruthy, _branchField: config.branchField, _branchValue: branchValue, ...result.outputs as Record<string, unknown> },
+          nextNodes,
+        };
+      } catch (err) {
+        return {
+          status: 'failed',
+          error: `Decision table evaluation failed: ${(err as Error).message}`,
+          output: {},
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Expression mode (existing behavior, unchanged)
+    // -----------------------------------------------------------------------
 
     // Use config.condition first, fall back to node.condition (used by seeded workflows)
     const conditionExpr = config?.condition || node.condition;
@@ -1070,10 +1164,89 @@ class ActionNodeExecutor implements NodeExecutor {
       }
     }
 
-    // Simulate different action types
+    // Execute action types
     switch (actionType) {
       case 'update_dataset':
-      case 'insert_record':
+      case 'insert_record': {
+        const datasetName = (config as any)?.datasetName || resolvedParams.datasetName || 'Leave Records';
+
+        try {
+          // Look up the dataset by name
+          const dataset = await prisma.dataset.findFirst({
+            where: { name: datasetName as string },
+          });
+
+          if (!dataset) {
+            return {
+              status: 'completed',
+              output: {
+                _actionType: actionType,
+                _actionResult: 'skipped',
+                _message: `Dataset '${datasetName}' not found — skipping insert`,
+              },
+            };
+          }
+
+          // Build record data from workflow variables
+          // Map known workflow variables to dataset column slugs
+          const vars = context.variables;
+          const recordData: Record<string, unknown> = {
+            employee: vars.employeeName || '',
+            department: vars.department || '',
+            leave_type: vars.leaveType || '',
+            start_date: vars.startDate || '',
+            end_date: vars.endDate || '',
+            total_days: vars.totalDays || 0,
+            reason: vars.reason || '',
+            status: vars.approvalStatus || 'Approved',
+            approved_by: vars.approvedBy || 'System',
+            comments: vars.approvalComments || '',
+            // Also include any explicit parameters from the node config
+            ...resolvedParams,
+          };
+
+          // Insert the record
+          const newRecord = await prisma.datasetRecord.create({
+            data: {
+              datasetId: dataset.id,
+              data: recordData as any,
+              // createdBy must be a valid UUID or undefined (column is nullable @db.Uuid)
+              createdBy: isValidUUID(context.execution.triggeredBy)
+                ? context.execution.triggeredBy
+                : undefined,
+            },
+          });
+
+          // Update the dataset row count
+          await prisma.dataset.update({
+            where: { id: dataset.id },
+            data: { rowCount: { increment: 1 } },
+          });
+
+          return {
+            status: 'completed',
+            output: {
+              _actionType: actionType,
+              _actionResult: 'success',
+              _recordId: newRecord.id,
+              _datasetId: dataset.id,
+              _datasetName: datasetName,
+              _message: `Record inserted into dataset '${datasetName}'`,
+            },
+          };
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          return {
+            status: 'completed',
+            output: {
+              _actionType: actionType,
+              _actionResult: 'error',
+              _message: `Failed to insert record: ${errMsg}`,
+            },
+          };
+        }
+      }
+
       case 'delete_record':
         return {
           status: 'completed',
@@ -1141,6 +1314,98 @@ class SubworkflowNodeExecutor implements NodeExecutor {
     }
 
     return { status: 'completed', output };
+  }
+}
+
+// ============================================================================
+// Business Rule Node Executor — evaluates a decision table
+// ============================================================================
+
+class BusinessRuleNodeExecutor implements NodeExecutor {
+  async execute(node: WorkflowNode, context: ExecutionContext): Promise<NodeExecutionResult> {
+    const config = node.config as BusinessRuleNodeConfig;
+
+    if (!config?.decisionTableId) {
+      return {
+        status: 'failed',
+        error: 'Business Rule node requires a decision table ID',
+        output: {},
+      };
+    }
+
+    try {
+      // Lazy import to avoid circular dependency
+      const { decisionTableService } = await import('../decisions/decision-table.service.js');
+
+      // Resolve input mappings: map workflow variables to table inputs
+      const tableInputs: Record<string, unknown> = {};
+      if (config.inputMapping) {
+        for (const [tableInputName, expression] of Object.entries(config.inputMapping)) {
+          // If expression is a simple variable name, look it up directly
+          if (expression in context.variables) {
+            tableInputs[tableInputName] = context.variables[expression];
+          } else {
+            // Try dot-path resolution (e.g. "input.category" → context.variables.input.category)
+            try {
+              const parts = expression.split('.');
+              let val: unknown = context.variables;
+              for (const part of parts) {
+                val = (val as Record<string, unknown>)?.[part];
+              }
+              tableInputs[tableInputName] = val !== undefined ? val : expression;
+            } catch {
+              // Fall back to using expression as literal value
+              tableInputs[tableInputName] = expression;
+            }
+          }
+        }
+      } else {
+        // No explicit mapping — pass all workflow variables as inputs
+        Object.assign(tableInputs, context.variables);
+      }
+
+      // Evaluate the decision table
+      const result = await decisionTableService.evaluate(
+        config.decisionTableId,
+        { inputs: tableInputs },
+        { source: `workflow:${context.execution.workflowId}:${context.execution.id}` }
+      );
+
+      // Check for no-match failures
+      if (config.failOnNoMatch && result.matchedRules.length === 0) {
+        return {
+          status: 'failed',
+          error: `No rules matched in decision table ${config.decisionTableId}`,
+          output: { _decisionResult: result },
+        };
+      }
+
+      // Store outputs in workflow variables
+      const outputVar = config.outputVariable || '_businessRuleResult';
+      context.variables[outputVar] = result.outputs;
+
+      // Also spread top-level outputs into variables for easy downstream access
+      if (result.outputs && typeof result.outputs === 'object' && !Array.isArray(result.outputs)) {
+        for (const [key, value] of Object.entries(result.outputs)) {
+          context.variables[key] = value;
+        }
+      }
+
+      return {
+        status: 'completed',
+        output: {
+          _decisionTableId: config.decisionTableId,
+          _matchedRules: result.matchedRules.length,
+          ...result.outputs as Record<string, unknown>,
+        },
+      };
+    } catch (err) {
+      return {
+        status: 'failed',
+        error: `Decision table evaluation failed: ${(err as Error).message}`,
+        output: {},
+      };
+    }
   }
 }
 
