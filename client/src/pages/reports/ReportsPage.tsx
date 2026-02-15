@@ -18,11 +18,7 @@ import {
     Loader2,
     RefreshCw,
     CheckCircle,
-    ArrowUpRight,
-    ArrowDownRight,
     AlertCircle,
-    Users,
-    ListChecks,
     Activity,
 } from 'lucide-react';
 import { Button, Input, Card, CardHeader, CardContent } from '../../components/ui';

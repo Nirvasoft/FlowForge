@@ -5,15 +5,11 @@ import {
     FileText,
     GitBranch,
     CheckSquare,
-    TrendingUp,
     Clock,
-    ArrowUpRight,
-    ArrowDownRight,
     Loader2,
     Play,
     Database,
     Table2,
-    Zap,
     AlertTriangle,
     CheckCircle2,
     XCircle,
@@ -21,7 +17,6 @@ import {
     ArrowRight,
     Activity,
     BarChart3,
-    Shield,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui';
 import { useAuth } from '../../contexts/AuthContext';

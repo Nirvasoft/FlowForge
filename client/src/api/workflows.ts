@@ -158,10 +158,13 @@ export async function listTasks(params: ListTasksParams = {}): Promise<Paginated
     const body = response.data;
     // Backend may return { tasks: [...], total } or { success, data, pagination }
     const rawItems = body.tasks || body.data || [];
-    // Normalize: backend uses `taskType` but frontend expects `type`
+    // Normalize: backend may use lowercase or different field names
     const items = rawItems.map((t: any) => ({
         ...t,
-        type: t.type || t.taskType || 'TASK',
+        name: t.name || t.title || 'Untitled Task',
+        type: (t.type || t.taskType || 'TASK').toUpperCase(),
+        status: (t.status || 'PENDING').toUpperCase(),
+        dueAt: t.dueAt || t.dueDate || undefined,
     }));
     const total = body.total ?? body.pagination?.total ?? items.length;
     const page = params.page || 1;

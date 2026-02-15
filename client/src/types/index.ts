@@ -148,6 +148,12 @@ export interface Task {
     assigneeId?: string;
     dueAt?: string;
     createdAt: string;
+    completedAt?: string;
+    completedBy?: string;
+    comments?: string;
+    formData?: Record<string, unknown>;
+    priority?: number;
+    workflowName?: string;
 }
 
 // Dashboard stats
