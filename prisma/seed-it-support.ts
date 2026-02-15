@@ -610,24 +610,29 @@ async function seedITSupportFlow() {
         },
     ];
 
+    const existingTickets = await prisma.datasetRecord.count({ where: { datasetId: ticketsDataset.id } });
     let ticketsCreated = 0;
-    for (const record of sampleTickets) {
-        await prisma.datasetRecord.create({
-            data: {
-                datasetId: ticketsDataset.id,
-                data: record,
-                createdBy: itUsers.find(u => u.firstName === record.requester.split(' ')[0])?.id || adminUser.id,
-            },
+    if (existingTickets === 0) {
+        for (const record of sampleTickets) {
+            await prisma.datasetRecord.create({
+                data: {
+                    datasetId: ticketsDataset.id,
+                    data: record,
+                    createdBy: itUsers.find(u => u.firstName === record.requester.split(' ')[0])?.id || adminUser.id,
+                },
+            });
+            ticketsCreated++;
+        }
+
+        await prisma.dataset.update({
+            where: { id: ticketsDataset.id },
+            data: { rowCount: ticketsCreated },
         });
-        ticketsCreated++;
+    } else {
+        ticketsCreated = existingTickets;
     }
 
-    await prisma.dataset.update({
-        where: { id: ticketsDataset.id },
-        data: { rowCount: ticketsCreated },
-    });
-
-    console.log(`✅ Created ${ticketsCreated} IT ticket records\n`);
+    console.log(`✅ IT ticket records: ${ticketsCreated}\n`);
 
     // ==========================================================================
     // 7. Create Knowledge Base Articles
@@ -675,22 +680,25 @@ async function seedITSupportFlow() {
         },
     ];
 
-    for (const article of kbArticles) {
-        await prisma.datasetRecord.create({
-            data: {
-                datasetId: kbDataset.id,
-                data: article,
-                createdBy: adminUser.id,
-            },
+    const existingKB = await prisma.datasetRecord.count({ where: { datasetId: kbDataset.id } });
+    if (existingKB === 0) {
+        for (const article of kbArticles) {
+            await prisma.datasetRecord.create({
+                data: {
+                    datasetId: kbDataset.id,
+                    data: article,
+                    createdBy: adminUser.id,
+                },
+            });
+        }
+
+        await prisma.dataset.update({
+            where: { id: kbDataset.id },
+            data: { rowCount: kbArticles.length },
         });
     }
 
-    await prisma.dataset.update({
-        where: { id: kbDataset.id },
-        data: { rowCount: kbArticles.length },
-    });
-
-    console.log(`✅ Created ${kbArticles.length} knowledge base articles\n`);
+    console.log(`✅ Knowledge base articles: ${kbArticles.length}\n`);
 
     // ==========================================================================
     // 8. Create Form Submissions
@@ -758,248 +766,256 @@ async function seedITSupportFlow() {
         },
     ];
 
-    for (const submission of formSubmissions) {
-        await prisma.formSubmission.create({
-            data: {
-                formId: itSupportForm.id,
-                data: submission,
-                createdBy: itUsers.find(u => u.firstName === submission.submittedBy.split(' ')[0])?.id || adminUser.id,
-            },
-        });
+    const existingSubmissions = await prisma.formSubmission.count({ where: { formId: itSupportForm.id } });
+    if (existingSubmissions === 0) {
+        for (const submission of formSubmissions) {
+            await prisma.formSubmission.create({
+                data: {
+                    formId: itSupportForm.id,
+                    data: submission,
+                    createdBy: itUsers.find(u => u.firstName === submission.submittedBy.split(' ')[0])?.id || adminUser.id,
+                },
+            });
+        }
     }
 
-    console.log(`✅ Created ${formSubmissions.length} form submissions\n`);
+    console.log(`✅ Form submissions: ${Math.max(existingSubmissions, formSubmissions.length)}\n`);
 
     // ==========================================================================
-    // 9. Create Process Instances
+    // 9. Create Process Instances & Tasks (idempotent)
     // ==========================================================================
+    const existingInstances = await prisma.processInstance.count({ where: { processId: itProcess.id } });
+    if (existingInstances === 0) {
 
-    // Instance 1: ACTIVE - Outlook crash (High, Tier-2, in progress)
-    const instance1 = await prisma.processInstance.create({
-        data: {
-            processId: itProcess.id,
-            processVersion: 1,
-            status: 'RUNNING',
-            currentNodes: ['assign-agent'],
-            variables: {
-                requestType: 'incident', category: 'software', priority: 'high',
-                subject: 'Outlook keeps crashing when opening large attachments',
-                affectedUsers: 1, assetTag: 'AST-042891',
-                ticketId: 'TKT-001', ticketStatus: 'in_progress',
-                assignedTo: 'tier-2', responseTimeSLA: '30 min', resolveTimeSLA: '4 hours',
+        // Instance 1: ACTIVE - Outlook crash (High, Tier-2, in progress)
+        const instance1 = await prisma.processInstance.create({
+            data: {
+                processId: itProcess.id,
+                processVersion: 1,
+                status: 'RUNNING',
+                currentNodes: ['assign-agent'],
+                variables: {
+                    requestType: 'incident', category: 'software', priority: 'high',
+                    subject: 'Outlook keeps crashing when opening large attachments',
+                    affectedUsers: 1, assetTag: 'AST-042891',
+                    ticketId: 'TKT-001', ticketStatus: 'in_progress',
+                    assignedTo: 'tier-2', responseTimeSLA: '30 min', resolveTimeSLA: '4 hours',
+                },
+                startedBy: itUsers[0].id,
             },
-            startedBy: itUsers[0].id,
-        },
-    });
+        });
 
-    // Instance 2: ACTIVE - VPN dropping (High, Tier-2, in progress)
-    const instance2 = await prisma.processInstance.create({
-        data: {
-            processId: itProcess.id,
-            processVersion: 1,
-            status: 'RUNNING',
-            currentNodes: ['assign-agent'],
-            variables: {
-                requestType: 'incident', category: 'network', priority: 'high',
-                subject: 'VPN connection dropping every 10 minutes',
-                affectedUsers: 3, assetTag: 'AST-038712',
-                ticketId: 'TKT-002', ticketStatus: 'in_progress',
-                assignedTo: 'tier-2', responseTimeSLA: '30 min', resolveTimeSLA: '4 hours',
+        // Instance 2: ACTIVE - VPN dropping (High, Tier-2, in progress)
+        const instance2 = await prisma.processInstance.create({
+            data: {
+                processId: itProcess.id,
+                processVersion: 1,
+                status: 'RUNNING',
+                currentNodes: ['assign-agent'],
+                variables: {
+                    requestType: 'incident', category: 'network', priority: 'high',
+                    subject: 'VPN connection dropping every 10 minutes',
+                    affectedUsers: 3, assetTag: 'AST-038712',
+                    ticketId: 'TKT-002', ticketStatus: 'in_progress',
+                    assignedTo: 'tier-2', responseTimeSLA: '30 min', resolveTimeSLA: '4 hours',
+                },
+                startedBy: itUsers[1].id,
             },
-            startedBy: itUsers[1].id,
-        },
-    });
+        });
 
-    // Instance 3: COMPLETED - Database server outage (Critical, Senior Team, resolved)
-    const instance3 = await prisma.processInstance.create({
-        data: {
-            processId: itProcess.id,
-            processVersion: 1,
-            status: 'COMPLETED',
-            currentNodes: ['end-resolved'],
-            variables: {
-                requestType: 'incident', category: 'software', priority: 'critical',
-                subject: 'Production database server unresponsive',
-                affectedUsers: 50,
-                ticketId: 'TKT-003', ticketStatus: 'resolved',
-                assignedTo: 'senior-team', responseTimeSLA: '15 min', resolveTimeSLA: '2 hours',
+        // Instance 3: COMPLETED - Database server outage (Critical, Senior Team, resolved)
+        const instance3 = await prisma.processInstance.create({
+            data: {
+                processId: itProcess.id,
+                processVersion: 1,
+                status: 'COMPLETED',
+                currentNodes: ['end-resolved'],
+                variables: {
+                    requestType: 'incident', category: 'software', priority: 'critical',
+                    subject: 'Production database server unresponsive',
+                    affectedUsers: 50,
+                    ticketId: 'TKT-003', ticketStatus: 'resolved',
+                    assignedTo: 'senior-team', responseTimeSLA: '15 min', resolveTimeSLA: '2 hours',
+                },
+                completedAt: new Date('2026-02-06T15:30:00Z'),
+                startedBy: itUsers[2].id,
             },
-            completedAt: new Date('2026-02-06T15:30:00Z'),
-            startedBy: itUsers[2].id,
-        },
-    });
+        });
 
-    // Instance 4: COMPLETED - Jira access request (Service, Tier-1, closed)
-    const instance4 = await prisma.processInstance.create({
-        data: {
-            processId: itProcess.id,
-            processVersion: 1,
-            status: 'COMPLETED',
-            currentNodes: ['end-resolved'],
-            variables: {
-                requestType: 'service', category: 'access', priority: 'medium',
-                subject: 'Need access to Jira project PLATFORM-2026',
-                affectedUsers: 1,
-                ticketId: 'TKT-004', ticketStatus: 'closed',
-                assignedTo: 'tier-1', responseTimeSLA: '4 hours', resolveTimeSLA: '1 day',
+        // Instance 4: COMPLETED - Jira access request (Service, Tier-1, closed)
+        const instance4 = await prisma.processInstance.create({
+            data: {
+                processId: itProcess.id,
+                processVersion: 1,
+                status: 'COMPLETED',
+                currentNodes: ['end-resolved'],
+                variables: {
+                    requestType: 'service', category: 'access', priority: 'medium',
+                    subject: 'Need access to Jira project PLATFORM-2026',
+                    affectedUsers: 1,
+                    ticketId: 'TKT-004', ticketStatus: 'closed',
+                    assignedTo: 'tier-1', responseTimeSLA: '4 hours', resolveTimeSLA: '1 day',
+                },
+                completedAt: new Date('2026-02-06T14:30:00Z'),
+                startedBy: itUsers[3].id,
             },
-            completedAt: new Date('2026-02-06T14:30:00Z'),
-            startedBy: itUsers[3].id,
-        },
-    });
+        });
 
-    // Instance 5: COMPLETED - Phishing email (Critical Security, resolved)
-    const instance5 = await prisma.processInstance.create({
-        data: {
-            processId: itProcess.id,
-            processVersion: 1,
-            status: 'COMPLETED',
-            currentNodes: ['end-resolved'],
-            variables: {
-                requestType: 'incident', category: 'security', priority: 'critical',
-                subject: 'Suspicious phishing email received',
-                affectedUsers: 1,
-                ticketId: 'TKT-006', ticketStatus: 'resolved',
-                assignedTo: 'security', responseTimeSLA: '5 min', resolveTimeSLA: '1 hour',
+        // Instance 5: COMPLETED - Phishing email (Critical Security, resolved)
+        const instance5 = await prisma.processInstance.create({
+            data: {
+                processId: itProcess.id,
+                processVersion: 1,
+                status: 'COMPLETED',
+                currentNodes: ['end-resolved'],
+                variables: {
+                    requestType: 'incident', category: 'security', priority: 'critical',
+                    subject: 'Suspicious phishing email received',
+                    affectedUsers: 1,
+                    ticketId: 'TKT-006', ticketStatus: 'resolved',
+                    assignedTo: 'security', responseTimeSLA: '5 min', resolveTimeSLA: '1 hour',
+                },
+                completedAt: new Date('2026-02-07T08:45:00Z'),
+                startedBy: itUsers[5].id,
             },
-            completedAt: new Date('2026-02-07T08:45:00Z'),
-            startedBy: itUsers[5].id,
-        },
-    });
+        });
 
-    // Instance 6: ACTIVE - WiFi outage Building B (Medium, escalated, SLA breached)
-    const instance6 = await prisma.processInstance.create({
-        data: {
-            processId: itProcess.id,
-            processVersion: 1,
-            status: 'RUNNING',
-            currentNodes: ['escalate-response'],
-            variables: {
-                requestType: 'incident', category: 'network', priority: 'medium',
-                subject: 'WiFi not connecting in Building B, Floor 3',
-                affectedUsers: 15,
-                ticketId: 'TKT-008', ticketStatus: 'escalated',
-                assignedTo: 'tier-2', responseTimeSLA: '2 hours', resolveTimeSLA: '1 day',
-                slaBreach: true,
+        // Instance 6: ACTIVE - WiFi outage Building B (Medium, escalated, SLA breached)
+        const instance6 = await prisma.processInstance.create({
+            data: {
+                processId: itProcess.id,
+                processVersion: 1,
+                status: 'RUNNING',
+                currentNodes: ['escalate-response'],
+                variables: {
+                    requestType: 'incident', category: 'network', priority: 'medium',
+                    subject: 'WiFi not connecting in Building B, Floor 3',
+                    affectedUsers: 15,
+                    ticketId: 'TKT-008', ticketStatus: 'escalated',
+                    assignedTo: 'tier-2', responseTimeSLA: '2 hours', resolveTimeSLA: '1 day',
+                    slaBreach: true,
+                },
+                startedBy: itUsers[1].id,
             },
-            startedBy: itUsers[1].id,
-        },
-    });
+        });
 
-    const processInstances = [instance1, instance2, instance3, instance4, instance5, instance6];
-    console.log(`✅ Created ${processInstances.length} process instances\n`);
+        console.log(`✅ Created 6 process instances\n`);
 
-    // ==========================================================================
-    // 10. Create Task Instances
-    // ==========================================================================
-    // Task 1: Investigate Outlook crash (PENDING - Active)
-    await prisma.taskInstance.create({
-        data: {
-            instanceId: instance1.id,
-            nodeId: 'assign-agent',
-            name: 'Investigate Outlook crash - TKT-001',
-            description: 'Investigate and resolve Outlook crashing when opening large attachments. Asset: AST-042891',
-            taskType: 'TASK',
-            assigneeId: itUsers[2].id, // David Park (Tier-2)
-            assigneeType: 'USER',
-            formData: {
-                ticketId: 'TKT-001', subject: 'Outlook crash with large attachments',
-                category: 'Software', priority: 'High', assetTag: 'AST-042891',
+        // ==========================================================================
+        // 10. Create Task Instances
+        // ==========================================================================
+        // Task 1: Investigate Outlook crash (PENDING - Active)
+        await prisma.taskInstance.create({
+            data: {
+                instanceId: instance1.id,
+                nodeId: 'assign-agent',
+                name: 'Investigate Outlook crash - TKT-001',
+                description: 'Investigate and resolve Outlook crashing when opening large attachments. Asset: AST-042891',
+                taskType: 'TASK',
+                assigneeId: itUsers[2].id, // David Park (Tier-2)
+                assigneeType: 'USER',
+                formData: {
+                    ticketId: 'TKT-001', subject: 'Outlook crash with large attachments',
+                    category: 'Software', priority: 'High', assetTag: 'AST-042891',
+                },
+                status: 'PENDING',
+                priority: 0,
+                dueAt: new Date('2026-02-07T14:15:00Z'),
             },
-            status: 'PENDING',
-            priority: 0,
-            dueAt: new Date('2026-02-07T14:15:00Z'),
-        },
-    });
+        });
 
-    // Task 2: Fix VPN connection drops (PENDING - Active)
-    await prisma.taskInstance.create({
-        data: {
-            instanceId: instance2.id,
-            nodeId: 'assign-agent',
-            name: 'Fix VPN connection drops - TKT-002',
-            description: 'VPN connection drops every 10 minutes for 3 users. Check GlobalProtect and Cisco AnyConnect clients.',
-            taskType: 'TASK',
-            assigneeId: itUsers[2].id, // David Park (Tier-2)
-            assigneeType: 'USER',
-            formData: {
-                ticketId: 'TKT-002', subject: 'VPN connection drops',
-                category: 'Network', priority: 'High',
+        // Task 2: Fix VPN connection drops (PENDING - Active)
+        await prisma.taskInstance.create({
+            data: {
+                instanceId: instance2.id,
+                nodeId: 'assign-agent',
+                name: 'Fix VPN connection drops - TKT-002',
+                description: 'VPN connection drops every 10 minutes for 3 users. Check GlobalProtect and Cisco AnyConnect clients.',
+                taskType: 'TASK',
+                assigneeId: itUsers[2].id, // David Park (Tier-2)
+                assigneeType: 'USER',
+                formData: {
+                    ticketId: 'TKT-002', subject: 'VPN connection drops',
+                    category: 'Network', priority: 'High',
+                },
+                status: 'PENDING',
+                priority: 0,
+                dueAt: new Date('2026-02-07T13:00:00Z'),
             },
-            status: 'PENDING',
-            priority: 0,
-            dueAt: new Date('2026-02-07T13:00:00Z'),
-        },
-    });
+        });
 
-    // Task 3: Fix WiFi outage (PENDING - Active, SLA breached)
-    await prisma.taskInstance.create({
-        data: {
-            instanceId: instance6.id,
-            nodeId: 'assign-agent',
-            name: 'Fix WiFi outage Building B Floor 3 - TKT-008',
-            description: 'Access point AP-B3-02 failed. 15 users affected. SLA breached - escalated to IT Manager.',
-            taskType: 'TASK',
-            assigneeId: itUsers[4].id, // Tom Harris
-            assigneeType: 'USER',
-            formData: {
-                ticketId: 'TKT-008', subject: 'WiFi outage Building B Floor 3',
-                category: 'Network', priority: 'Medium', affectedUsers: 15,
+        // Task 3: Fix WiFi outage (PENDING - Active, SLA breached)
+        await prisma.taskInstance.create({
+            data: {
+                instanceId: instance6.id,
+                nodeId: 'assign-agent',
+                name: 'Fix WiFi outage Building B Floor 3 - TKT-008',
+                description: 'Access point AP-B3-02 failed. 15 users affected. SLA breached - escalated to IT Manager.',
+                taskType: 'TASK',
+                assigneeId: itUsers[4].id, // Tom Harris
+                assigneeType: 'USER',
+                formData: {
+                    ticketId: 'TKT-008', subject: 'WiFi outage Building B Floor 3',
+                    category: 'Network', priority: 'Medium', affectedUsers: 15,
+                },
+                status: 'PENDING',
+                priority: 1,
+                dueAt: new Date('2026-02-08T09:00:00Z'),
+                slaBreached: true,
             },
-            status: 'PENDING',
-            priority: 1,
-            dueAt: new Date('2026-02-08T09:00:00Z'),
-            slaBreached: true,
-        },
-    });
+        });
 
-    // Task 4: Satisfaction survey for DB outage (COMPLETED)
-    await prisma.taskInstance.create({
-        data: {
-            instanceId: instance3.id,
-            nodeId: 'customer-survey',
-            name: 'Satisfaction survey - Database server outage - TKT-003',
-            description: 'Send satisfaction survey to David Park for resolved critical incident.',
-            taskType: 'TASK',
-            assigneeId: itUsers[2].id,
-            assigneeType: 'USER',
-            formData: {
-                ticketId: 'TKT-003', subject: 'Database server unresponsive',
+        // Task 4: Satisfaction survey for DB outage (COMPLETED)
+        await prisma.taskInstance.create({
+            data: {
+                instanceId: instance3.id,
+                nodeId: 'customer-survey',
+                name: 'Satisfaction survey - Database server outage - TKT-003',
+                description: 'Send satisfaction survey to David Park for resolved critical incident.',
+                taskType: 'TASK',
+                assigneeId: itUsers[2].id,
+                assigneeType: 'USER',
+                formData: {
+                    ticketId: 'TKT-003', subject: 'Database server unresponsive',
+                },
+                status: 'COMPLETED',
+                priority: 2,
+                dueAt: new Date('2026-02-07T15:30:00Z'),
+                outcome: 'completed',
+                completedAt: new Date('2026-02-07T16:00:00Z'),
+                completedBy: itUsers[2].id,
             },
-            status: 'COMPLETED',
-            priority: 2,
-            dueAt: new Date('2026-02-07T15:30:00Z'),
-            outcome: 'completed',
-            completedAt: new Date('2026-02-07T16:00:00Z'),
-            completedBy: itUsers[2].id,
-        },
-    });
+        });
 
-    // Task 5: Handle phishing report (COMPLETED)
-    await prisma.taskInstance.create({
-        data: {
-            instanceId: instance5.id,
-            nodeId: 'assign-agent',
-            name: 'Handle phishing report - TKT-006',
-            description: 'Investigate phishing email from ceo@company-notice.com. Block domain and send company alert.',
-            taskType: 'TASK',
-            assigneeId: itUsers[5].id, // Nina Patel (Security)
-            assigneeType: 'USER',
-            formData: {
-                ticketId: 'TKT-006', subject: 'Phishing email from ceo@company-notice.com',
-                category: 'Security', priority: 'Critical',
+        // Task 5: Handle phishing report (COMPLETED)
+        await prisma.taskInstance.create({
+            data: {
+                instanceId: instance5.id,
+                nodeId: 'assign-agent',
+                name: 'Handle phishing report - TKT-006',
+                description: 'Investigate phishing email from ceo@company-notice.com. Block domain and send company alert.',
+                taskType: 'TASK',
+                assigneeId: itUsers[5].id, // Nina Patel (Security)
+                assigneeType: 'USER',
+                formData: {
+                    ticketId: 'TKT-006', subject: 'Phishing email from ceo@company-notice.com',
+                    category: 'Security', priority: 'Critical',
+                },
+                status: 'COMPLETED',
+                priority: 0,
+                dueAt: new Date('2026-02-07T09:00:00Z'),
+                outcome: 'completed',
+                completedAt: new Date('2026-02-07T08:45:00Z'),
+                completedBy: itUsers[5].id,
+                comments: 'Phishing email blocked. Domain added to blocklist. Company-wide alert sent.',
             },
-            status: 'COMPLETED',
-            priority: 0,
-            dueAt: new Date('2026-02-07T09:00:00Z'),
-            outcome: 'completed',
-            completedAt: new Date('2026-02-07T08:45:00Z'),
-            completedBy: itUsers[5].id,
-            comments: 'Phishing email blocked. Domain added to blocklist. Company-wide alert sent.',
-        },
-    });
+        });
 
-    console.log(`✅ Created 5 task instances\n`);
+        console.log(`✅ Created 5 task instances\n`);
+
+    } else {
+        console.log(`✅ Process instances already exist: ${existingInstances} (skipped)\n`);
+    }
 
     // ==========================================================================
     // Summary

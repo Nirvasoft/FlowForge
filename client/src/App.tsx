@@ -14,6 +14,8 @@ import { DRDDesigner } from './pages/decision-tables/DRDDesigner';
 import { IntegrationsPage } from './pages/integrations';
 import { ReportsPage } from './pages/reports';
 import { SettingsPage } from './pages/settings';
+import { TaskInboxPage } from './pages/workflows/TaskInboxPage';
+import { ProcessDashboardPage } from './pages/workflows/ProcessDashboardPage';
 
 function App() {
   return (
@@ -44,6 +46,8 @@ function App() {
             <Route path="/datasets" element={<DatasetsPage />} />
             <Route path="/datasets/:id" element={<DatasetDetailPage />} />
             <Route path="/workflows" element={<WorkflowsPage />} />
+            <Route path="/tasks" element={<TaskInboxPage />} />
+            <Route path="/processes" element={<ProcessDashboardPage />} />
             <Route path="/apps" element={<AppsPage />} />
             <Route path="/decision-tables" element={<DecisionTablesPage />} />
             <Route path="/integrations" element={<IntegrationsPage />} />

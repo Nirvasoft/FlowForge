@@ -79,7 +79,46 @@ function toApplication(record: any): any {
     description: record.description,
     icon: record.icon,
     type: def.type || 'internal',
-    pages: def.pages || [],
+    pages: record.pages
+      ? record.pages.map((p: any) => {
+        const layoutObj = p.layout || { rows: [] };
+        // Extract components from layout.rows[].columns[].components[]
+        const extractedComponents: any[] = [];
+        if (layoutObj.rows && Array.isArray(layoutObj.rows)) {
+          layoutObj.rows.forEach((row: any, rowIdx: number) => {
+            if (row.columns && Array.isArray(row.columns)) {
+              let colOffset = 0;
+              row.columns.forEach((col: any) => {
+                if (col.components && Array.isArray(col.components)) {
+                  col.components.forEach((comp: any) => {
+                    extractedComponents.push({
+                      id: comp.id || `${p.id}-comp-${extractedComponents.length}`,
+                      type: comp.type,
+                      name: comp.props?.title || comp.type,
+                      position: { row: rowIdx, column: colOffset, width: col.width || 12 },
+                      props: comp.props || {},
+                    });
+                  });
+                }
+                colOffset += (col.width || 12);
+              });
+            }
+          });
+        }
+        return {
+          id: p.id,
+          name: p.name,
+          route: p.route,
+          slug: p.route,
+          icon: p.icon,
+          layout: layoutObj,
+          components: extractedComponents.length > 0 ? extractedComponents : (p.components || []),
+          dataSources: p.dataSources || [],
+          title: p.title,
+          description: p.description,
+        };
+      })
+      : (def.pages || []),
     navigation: def.navigation
       ? { type: 'sidebar', position: 'left', collapsed: false, items: def.navigation }
       : { type: 'sidebar', position: 'left', collapsed: false, items: [] },
@@ -176,7 +215,10 @@ export class AppBuilderService {
   }
 
   async getApp(id: string): Promise<any | null> {
-    const record = await prisma.app.findUnique({ where: { id } });
+    const record = await prisma.app.findUnique({
+      where: { id },
+      include: { pages: true },
+    });
     if (!record) return null;
     return toApplication(record);
   }
@@ -214,6 +256,7 @@ export class AppBuilderService {
     const [records, total] = await Promise.all([
       prisma.app.findMany({
         where,
+        include: { pages: { select: { id: true, name: true, route: true } } },
         orderBy: { updatedAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -664,6 +707,73 @@ export class AppBuilderService {
     def.portalSettings = { ...(def.portalSettings || {}), ...settings };
     await prisma.app.update({ where: { id: appId }, data: { definition: def as any, updatedAt: new Date() } });
     return def.portalSettings;
+  }
+
+  // ==========================================================================
+  // Data Source Resolution — fetch live workflow data at runtime
+  // ==========================================================================
+
+  async resolveDataSource(
+    dataSource: { type: string; config: Record<string, unknown> }
+  ): Promise<{ data: any[]; total: number }> {
+    const { type, config } = dataSource;
+
+    switch (type) {
+      case 'tasks': {
+        const where: any = {};
+        if (config.status) where.status = config.status;
+        if (config.workflowId) where.processId = config.workflowId;
+        if (config.assigneeId) where.assigneeId = config.assigneeId;
+
+        const [items, total] = await Promise.all([
+          prisma.taskInstance.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            take: (config.pageSize as number) || 50,
+            skip: (config.offset as number) || 0,
+          }),
+          prisma.taskInstance.count({ where }),
+        ]);
+        return { data: items, total };
+      }
+
+      case 'instances': {
+        const where: any = {};
+        if (config.status) where.status = config.status;
+        if (config.workflowId) where.processId = config.workflowId;
+
+        const [items, total] = await Promise.all([
+          prisma.processInstance.findMany({
+            where,
+            orderBy: { startedAt: 'desc' },
+            include: { process: { select: { name: true } } },
+            take: (config.pageSize as number) || 50,
+            skip: (config.offset as number) || 0,
+          }),
+          prisma.processInstance.count({ where }),
+        ]);
+        return { data: items, total };
+      }
+
+      case 'formData': {
+        const where: any = {};
+        if (config.formId) where.formId = config.formId;
+
+        const [items, total] = await Promise.all([
+          prisma.formSubmission.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            take: (config.pageSize as number) || 50,
+            skip: (config.offset as number) || 0,
+          }),
+          prisma.formSubmission.count({ where }),
+        ]);
+        return { data: items, total };
+      }
+
+      default:
+        return { data: [], total: 0 };
+    }
   }
 
   // ==========================================================================

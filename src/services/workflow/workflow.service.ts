@@ -20,6 +20,10 @@ import type {
 import { WorkflowEngine, workflowEngine } from './engine';
 import { prisma } from '../../utils/prisma.js';
 import { auditService } from '../audit/audit.service';
+import { eventBus } from '../events/event-bus';
+import { createLogger } from '../../utils/logger.js';
+
+const logger = createLogger('workflow-service');
 
 // ============================================================================
 // In-Memory Storage (acts as a cache; Prisma is the fallback source of truth)
@@ -707,21 +711,49 @@ export class WorkflowService {
 
     executions.set(execution.id, execution);
 
-    // Persist to DB so it survives server restarts
+    // Persist execution + any created tasks atomically via transaction
     try {
       const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const isUUID = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v);
-      await prisma.processInstance.create({
-        data: {
-          id: execution.id,
-          processId: workflowId,
-          processVersion: workflow.version || 1,
-          status: (execution.status || 'running').toUpperCase() === 'WAITING' ? 'RUNNING' : (execution.status || 'running').toUpperCase() as any,
-          currentNodes: execution.currentNodes || [],
-          variables: (execution.variables || {}) as any,
-          startedAt: execution.startedAt || new Date(),
-          startedBy: isUUID(triggeredBy) ? triggeredBy : (isUUID(workflow.createdBy) ? workflow.createdBy : undefined as any),
-        },
+
+      await prisma.$transaction(async (tx) => {
+        // 1. Persist the execution instance
+        await tx.processInstance.create({
+          data: {
+            id: execution.id,
+            processId: workflowId,
+            processVersion: workflow.version || 1,
+            status: (execution.status || 'running').toUpperCase() === 'WAITING' ? 'RUNNING' : (execution.status || 'running').toUpperCase() as any,
+            currentNodes: execution.currentNodes || [],
+            variables: (execution.variables || {}) as any,
+            startedAt: execution.startedAt || new Date(),
+            startedBy: isUUID(triggeredBy) ? triggeredBy : (isUUID(workflow.createdBy) ? workflow.createdBy : undefined as any),
+          },
+        });
+
+        // 2. Persist any human tasks that were created during execution
+        for (const [, task] of tasks) {
+          if (task.executionId === execution.id) {
+            try {
+              await tx.taskInstance.create({
+                data: {
+                  id: task.id,
+                  instanceId: execution.id,
+                  nodeId: task.nodeId || 'unknown',
+                  name: task.title || 'Task',
+                  taskType: (task.type || 'task').toUpperCase() as any,
+                  status: (task.status || 'pending').toUpperCase() as any,
+                  assigneeId: isUUID(task.assignees?.[0]) ? task.assignees[0] : undefined,
+                  candidateUsers: task.assignees || [],
+                  formData: (task.formData || {}) as any,
+                  dueAt: task.dueDate || null,
+                },
+              });
+            } catch {
+              // Task may already exist (idempotent)
+            }
+          }
+        }
       });
     } catch (e) {
       console.warn('Could not persist execution to DB:', (e as Error).message);
@@ -1180,21 +1212,46 @@ export class WorkflowService {
 
     tasks.set(taskId, task);
 
-    // Persist to DB
+    // Persist task completion + update execution status atomically
     try {
       const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const isUUID = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v);
-      await prisma.taskInstance.update({
-        where: { id: taskId },
-        data: {
-          status: 'COMPLETED',
-          outcome,
-          comments: comments || null,
-          completedAt: new Date(),
-          completedBy: isUUID(userId) ? userId : undefined,
-        },
+      await prisma.$transaction(async (tx) => {
+        await tx.taskInstance.update({
+          where: { id: taskId },
+          data: {
+            status: 'COMPLETED',
+            outcome,
+            comments: comments || null,
+            completedAt: new Date(),
+            completedBy: isUUID(userId) ? userId : undefined,
+          },
+        });
+
+        // Also update the execution's status to reflect that it's no longer waiting
+        if (task!.executionId) {
+          await tx.processInstance.update({
+            where: { id: task!.executionId },
+            data: {
+              status: 'RUNNING',
+            },
+          }).catch(() => { /* execution may not exist in DB yet */ });
+        }
       });
     } catch { }
+
+    // Emit task.completed event via event bus
+    eventBus.emit({
+      type: 'task.completed',
+      taskId,
+      executionId: task.executionId,
+      workflowId: task.workflowId,
+      nodeId: task.nodeId,
+      outcome,
+      responseData,
+      completedBy: userId,
+      timestamp: new Date(),
+    });
 
     // Resume workflow execution (loads from DB if not in memory)
     let execution = executions.get(task.executionId);
@@ -1274,3 +1331,60 @@ export class WorkflowService {
 }
 
 export const workflowService = new WorkflowService();
+
+// ============================================================================
+// Event Bus Listeners — connect Forms → Workflows
+// ============================================================================
+
+eventBus.on('form.submitted', async (event) => {
+  // Find active workflows with form triggers matching this formId
+  try {
+    const processes = await prisma.process.findMany({
+      where: { status: 'ACTIVE' },
+    });
+
+    for (const process of processes) {
+      const definition = (process as any).definition as any || {};
+      // Triggers can live in two places:
+      // 1. Top-level `triggers` column (used by seed scripts)
+      // 2. Inside `definition.triggers` (used by the workflow designer)
+      const topLevelTriggers = Array.isArray((process as any).triggers) ? (process as any).triggers : [];
+      const defTriggers = Array.isArray(definition.triggers) ? definition.triggers : [];
+      const triggers: any[] = topLevelTriggers.length > 0 ? topLevelTriggers : defTriggers;
+
+      const hasFormTrigger = triggers.some(
+        (t: any) => (t.type === 'form_submission' || t.type === 'form') && t.formId === event.formId
+      );
+
+      if (hasFormTrigger) {
+        logger.info(
+          { formId: event.formId, processId: process.id, processName: process.name },
+          'Triggering workflow from form.submitted event'
+        );
+
+        try {
+          await workflowService.startExecution(
+            process.id,
+            event.data,
+            event.submittedBy || 'system',
+            'form'
+          );
+          logger.info(
+            { formId: event.formId, processId: process.id },
+            'Workflow execution started from form.submitted event'
+          );
+        } catch (execError) {
+          logger.error(
+            { formId: event.formId, processId: process.id, error: execError },
+            'Failed to trigger workflow from form.submitted event'
+          );
+        }
+      }
+    }
+  } catch (err) {
+    logger.error(
+      { formId: event.formId, error: err },
+      'Failed to process form.submitted event'
+    );
+  }
+});

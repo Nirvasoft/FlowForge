@@ -455,7 +455,90 @@ const componentDefinitions: ComponentDefinition[] = [
     eventDefinitions: [],
     isContainer: false,
   },
+
+  // ============================================================================
+  // Workflow Components
+  // ============================================================================
+  {
+    type: 'task-inbox',
+    name: 'Task Inbox',
+    category: 'workflow',
+    icon: 'inbox',
+    description: 'Displays pending and active tasks with claim, approve, reject, and complete actions',
+    defaultProps: { compact: false, autoRefresh: true, refreshInterval: 15000 },
+    propDefinitions: [
+      { name: 'compact', label: 'Compact Mode', type: 'boolean', description: 'Use compact layout for embedding' },
+      { name: 'autoRefresh', label: 'Auto Refresh', type: 'boolean' },
+      { name: 'refreshInterval', label: 'Refresh Interval (ms)', type: 'number' },
+      {
+        name: 'filterType', label: 'Filter by Type', type: 'select', options: [
+          { label: 'All', value: '' },
+          { label: 'Approval', value: 'APPROVAL' },
+          { label: 'Form', value: 'FORM' },
+          { label: 'Review', value: 'REVIEW' },
+          { label: 'Assignment', value: 'ASSIGNMENT' },
+        ]
+      },
+      { name: 'filterWorkflowId', label: 'Filter by Workflow', type: 'string', bindable: true },
+    ],
+    eventDefinitions: [
+      { name: 'rowClick', label: 'On Task Action', description: 'Triggered when a task action (claim, complete, etc.) is performed' },
+    ],
+    isContainer: false,
+  },
+  {
+    type: 'process-starter',
+    name: 'Process Starter',
+    category: 'workflow',
+    icon: 'play',
+    description: 'A button/form that starts a new workflow execution',
+    defaultProps: { workflowId: '', label: 'Start Process', variant: 'primary', showInputForm: false },
+    propDefinitions: [
+      { name: 'workflowId', label: 'Workflow ID', type: 'string', bindable: true, required: true },
+      { name: 'label', label: 'Button Label', type: 'string', bindable: true },
+      {
+        name: 'variant', label: 'Variant', type: 'select', options: [
+          { label: 'Primary', value: 'primary' },
+          { label: 'Secondary', value: 'secondary' },
+          { label: 'Outline', value: 'outline' },
+        ]
+      },
+      { name: 'showInputForm', label: 'Show Input Form', type: 'boolean', description: 'Show a form for initial workflow variables' },
+      { name: 'inputFields', label: 'Input Fields', type: 'json', description: 'Define fields for the input form' },
+      { name: 'successMessage', label: 'Success Message', type: 'string' },
+    ],
+    eventDefinitions: [
+      { name: 'submit', label: 'On Process Started', description: 'Triggered when a new process instance is created' },
+    ],
+    isContainer: false,
+  },
+  {
+    type: 'instance-viewer',
+    name: 'Instance Viewer',
+    category: 'workflow',
+    icon: 'activity',
+    description: 'Displays workflow execution instances with status, timeline, and progress',
+    defaultProps: { workflowId: '', showTimeline: true, pageSize: 10 },
+    propDefinitions: [
+      { name: 'workflowId', label: 'Filter by Workflow', type: 'string', bindable: true },
+      { name: 'showTimeline', label: 'Show Timeline', type: 'boolean' },
+      { name: 'pageSize', label: 'Page Size', type: 'number' },
+      {
+        name: 'statusFilter', label: 'Status Filter', type: 'select', options: [
+          { label: 'All', value: '' },
+          { label: 'Running', value: 'RUNNING' },
+          { label: 'Completed', value: 'COMPLETED' },
+          { label: 'Failed', value: 'FAILED' },
+        ]
+      },
+    ],
+    eventDefinitions: [
+      { name: 'rowClick', label: 'On Instance Click', description: 'Triggered when an instance is clicked' },
+    ],
+    isContainer: false,
+  },
 ];
+
 
 // ============================================================================
 // Component Registry Service

@@ -134,7 +134,9 @@ export type ComponentType =
   // Content
   | 'text' | 'heading' | 'markdown' | 'html' | 'iframe' | 'divider' | 'spacer'
   // Custom
-  | 'custom-code' | 'workflow-trigger';
+  | 'custom-code' | 'workflow-trigger'
+  // Workflow
+  | 'task-inbox' | 'process-starter' | 'instance-viewer';
 
 // ============================================================================
 // Data Binding Types
@@ -171,7 +173,7 @@ export interface PageAction {
   condition?: string;
 }
 
-export type ActionType = 'navigate' | 'openModal' | 'closeModal' | 'setVariable' | 'refreshData' | 'submitForm' | 'callApi' | 'triggerWorkflow' | 'showNotification' | 'downloadFile' | 'copyToClipboard' | 'openUrl' | 'runScript';
+export type ActionType = 'navigate' | 'openModal' | 'closeModal' | 'setVariable' | 'refreshData' | 'submitForm' | 'callApi' | 'triggerWorkflow' | 'showNotification' | 'downloadFile' | 'copyToClipboard' | 'openUrl' | 'runScript' | 'startWorkflow' | 'claimTask' | 'completeTask';
 
 // ============================================================================
 // Navigation Types
@@ -203,7 +205,7 @@ export interface NavigationItem {
 export interface DataSourceConfig {
   id: string;
   name: string;
-  type: 'dataset' | 'api' | 'workflow' | 'static';
+  type: 'dataset' | 'api' | 'workflow' | 'static' | 'tasks' | 'instances' | 'formData';
   config: Record<string, unknown>;
   cacheEnabled: boolean;
   cacheDuration?: number;
@@ -324,7 +326,7 @@ export interface ComponentDefinition {
   allowedChildren?: ComponentType[];
 }
 
-export type ComponentCategory = 'layout' | 'data-display' | 'input' | 'charts' | 'navigation' | 'feedback' | 'media' | 'content' | 'custom';
+export type ComponentCategory = 'layout' | 'data-display' | 'input' | 'charts' | 'navigation' | 'feedback' | 'media' | 'content' | 'custom' | 'workflow';
 
 export interface PropDefinition {
   name: string;

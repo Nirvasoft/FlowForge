@@ -4,6 +4,7 @@
  */
 
 import { randomUUID } from 'crypto';
+import { runInNewContext } from 'node:vm';
 import type {
   Workflow,
   WorkflowNode,
@@ -12,6 +13,7 @@ import type {
   ExecutionStatus,
   NodeExecutionState,
   NodeExecutionStatus,
+  RetryPolicy,
   ExecutionLog,
   NodeConfig,
   DecisionNodeConfig,
@@ -40,6 +42,22 @@ function isValidUUID(val: unknown): val is string {
 }
 
 // ============================================================================
+// Engine Constants
+// ============================================================================
+
+/** Hard limit on total node executions per workflow run (circuit breaker) */
+const MAX_NODE_EXECUTIONS = 1000;
+
+/** Maximum times a single node can be visited before triggering cycle detection */
+const MAX_NODE_VISITS = 50;
+
+/** Default per-node timeout in milliseconds (30 seconds) */
+const NODE_DEFAULT_TIMEOUT_MS = 30_000;
+
+/** Default script sandbox timeout in milliseconds (5 seconds) */
+const SCRIPT_TIMEOUT_MS = 5_000;
+
+// ============================================================================
 // Execution Context
 // ============================================================================
 
@@ -50,6 +68,8 @@ export interface ExecutionContext {
   nodeStates: Map<string, NodeExecutionState>;
   expressionService: ExpressionService;
   onTaskCreated?: (task: any) => void;
+  /** Tracks how many times each node has been visited (cycle detection) */
+  visitCounts: Map<string, number>;
 }
 
 export interface EngineCallbacks {
@@ -184,9 +204,38 @@ export class WorkflowEngine {
     // Log start
     this.log(context, 'info', `Starting workflow execution: ${workflow.name}`);
 
-    // Execute from start node
+    // Execute from start node with execution-level timeout enforcement
     execution.currentNodes = [startNode.id];
-    await this.executeNodes(context, [startNode.id]);
+    const timeoutMs = (workflow.settings?.timeout || 3600) * 1000;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+      await Promise.race([
+        this.executeNodes(context, [startNode.id]),
+        new Promise<never>((_, reject) => {
+          timeoutHandle = setTimeout(
+            () => reject(new Error('EXECUTION_TIMEOUT')),
+            timeoutMs
+          );
+        }),
+      ]);
+    } catch (err) {
+      if ((err as Error).message === 'EXECUTION_TIMEOUT') {
+        execution.status = 'failed';
+        execution.error = {
+          nodeId: execution.currentNodes[0] || '',
+          code: 'EXECUTION_TIMEOUT',
+          message: `Workflow execution exceeded timeout of ${workflow.settings.timeout}s`,
+          retryCount: 0,
+          recoverable: false,
+        };
+        this.log(context, 'error', execution.error.message);
+      } else {
+        throw err;
+      }
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
 
     return execution;
   }
@@ -271,6 +320,36 @@ export class WorkflowEngine {
     for (const nodeId of nodeIds) {
       if (execution.status !== 'running') break;
 
+      // ── Circuit breaker: prevent runaway executions ──
+      if (execution.metrics.nodeExecutions >= MAX_NODE_EXECUTIONS) {
+        execution.status = 'failed';
+        execution.error = {
+          nodeId,
+          code: 'MAX_EXECUTIONS_EXCEEDED',
+          message: `Circuit breaker: exceeded ${MAX_NODE_EXECUTIONS} total node executions`,
+          retryCount: 0,
+          recoverable: false,
+        };
+        this.log(context, 'error', execution.error.message, nodeId);
+        break;
+      }
+
+      // ── Cycle detection: prevent infinite loops on the same node ──
+      const visits = (context.visitCounts.get(nodeId) || 0) + 1;
+      context.visitCounts.set(nodeId, visits);
+      if (visits > MAX_NODE_VISITS) {
+        execution.status = 'failed';
+        execution.error = {
+          nodeId,
+          code: 'INFINITE_LOOP_DETECTED',
+          message: `Node "${nodeId}" visited ${visits} times — likely infinite loop`,
+          retryCount: 0,
+          recoverable: false,
+        };
+        this.log(context, 'error', execution.error.message, nodeId);
+        break;
+      }
+
       const node = workflow.nodes.find(n => n.id === nodeId);
       if (!node) {
         this.log(context, 'error', `Node not found: ${nodeId}`);
@@ -296,8 +375,8 @@ export class WorkflowEngine {
         }
       }
 
-      // Execute node
-      const result = await this.executeNode(context, node);
+      // Execute node (with retry logic)
+      const result = await this.executeNodeWithRetry(context, node);
 
       if (result.status === 'failed') {
         // Handle error
@@ -313,13 +392,13 @@ export class WorkflowEngine {
             nodeId,
             code: 'NODE_EXECUTION_FAILED',
             message: result.error || 'Unknown error',
-            retryCount: 0,
+            retryCount: context.nodeStates.get(nodeId)?.retryCount || 0,
             recoverable: false,
           };
           break;
         }
       } else if (result.status === 'waiting') {
-        // Waiting for human task
+        // Waiting for human task or delay
         execution.status = 'waiting';
         execution.currentNodes = [nodeId];
         break;
@@ -347,7 +426,45 @@ export class WorkflowEngine {
   }
 
   /**
-   * Execute a single node
+   * Execute a single node with retry support
+   */
+  private async executeNodeWithRetry(
+    context: ExecutionContext,
+    node: WorkflowNode
+  ): Promise<NodeExecutionResult> {
+    const retryPolicy = context.workflow.settings?.retryPolicy;
+    const maxAttempts = retryPolicy?.enabled ? retryPolicy.maxAttempts : 1;
+    let lastResult: NodeExecutionResult = { status: 'failed', error: 'Unknown error' };
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (attempt > 1) {
+        const delay = this.calculateBackoff(retryPolicy!, attempt);
+        this.log(
+          context, 'warn',
+          `Retry ${attempt}/${maxAttempts} for node "${node.name}" after ${delay}ms`,
+          node.id
+        );
+        await new Promise(r => setTimeout(r, delay));
+        context.execution.metrics.retriedNodes++;
+      }
+
+      lastResult = await this.executeNode(context, node);
+
+      // If succeeded or waiting for human task, stop retrying
+      if (lastResult.status !== 'failed') return lastResult;
+
+      // Check if error is retryable
+      if (!this.isRetryable(retryPolicy, lastResult.error)) {
+        this.log(context, 'info', `Error is not retryable, skipping remaining attempts`, node.id);
+        break;
+      }
+    }
+
+    return lastResult;
+  }
+
+  /**
+   * Execute a single node with per-node timeout
    */
   private async executeNode(
     context: ExecutionContext,
@@ -369,7 +486,22 @@ export class WorkflowEngine {
         executor = new PassthroughNodeExecutor();
       }
 
-      const result = await executor.execute(node, context);
+      // Per-node timeout enforcement
+      const nodeTimeoutMs = (node.config as any)?.timeout
+        ? (node.config as any).timeout * 1000
+        : NODE_DEFAULT_TIMEOUT_MS;
+
+      let nodeTimeoutHandle: ReturnType<typeof setTimeout> | undefined;
+      const result = await Promise.race([
+        executor.execute(node, context),
+        new Promise<NodeExecutionResult>((_, reject) => {
+          nodeTimeoutHandle = setTimeout(
+            () => reject(new Error('NODE_TIMEOUT')),
+            nodeTimeoutMs
+          );
+        }),
+      ]);
+      if (nodeTimeoutHandle) clearTimeout(nodeTimeoutHandle);
 
       // Update node state
       const state = context.nodeStates.get(node.id)!;
@@ -394,15 +526,64 @@ export class WorkflowEngine {
 
       return result;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      this.setNodeState(context, node.id, 'failed');
-      this.log(context, 'error', `Node error: ${message}`, node.id);
+      const rawMessage = error instanceof Error ? error.message : 'Unknown error';
+      const code = rawMessage === 'NODE_TIMEOUT' ? 'NODE_TIMEOUT' : 'NODE_ERROR';
+      const message = rawMessage === 'NODE_TIMEOUT'
+        ? `Node "${node.name}" exceeded timeout`
+        : rawMessage;
+
+      const state = context.nodeStates.get(node.id);
+      if (state) {
+        state.status = 'failed';
+        state.retryCount = (state.retryCount || 0) + 1;
+      } else {
+        this.setNodeState(context, node.id, 'failed');
+      }
+      this.log(context, 'error', `${code}: ${message}`, node.id);
 
       return {
         status: 'failed',
         error: message,
       };
     }
+  }
+
+  // ── Retry Helpers ──
+
+  /**
+   * Calculate backoff delay for a retry attempt
+   */
+  private calculateBackoff(policy: RetryPolicy, attempt: number): number {
+    const { backoffType, initialDelay, maxDelay } = policy;
+    let delay: number;
+    switch (backoffType) {
+      case 'exponential':
+        delay = initialDelay * Math.pow(2, attempt - 2);
+        break;
+      case 'linear':
+        delay = initialDelay * (attempt - 1);
+        break;
+      case 'fixed':
+      default:
+        delay = initialDelay;
+        break;
+    }
+    // Add jitter (±10%) to prevent thundering herd
+    const jitter = delay * 0.1 * (Math.random() * 2 - 1);
+    return Math.min(Math.round(delay + jitter), maxDelay);
+  }
+
+  /**
+   * Check if an error is retryable based on the retry policy
+   */
+  private isRetryable(policy: RetryPolicy | undefined, error?: string): boolean {
+    if (!policy?.enabled) return false;
+    // NODE_TIMEOUT errors are always retryable
+    if (error === 'NODE_TIMEOUT' || error?.includes('exceeded timeout')) return true;
+    // If no specific retryable errors configured, retry all
+    if (!policy.retryableErrors?.length) return true;
+    // Check against configured patterns
+    return policy.retryableErrors.some(pattern => error?.includes(pattern));
   }
 
   /**
@@ -454,6 +635,7 @@ export class WorkflowEngine {
       nodeStates: new Map(),
       expressionService: this.expressionService,
       onTaskCreated: callbacks?.onTaskCreated,
+      visitCounts: new Map(),
     };
   }
 
@@ -764,9 +946,19 @@ class DelayNodeExecutor implements NodeExecutor {
       duration = engine.evaluateExpression(context, config.durationExpression) as number;
     }
 
-    await new Promise(resolve => setTimeout(resolve, duration));
+    // Return a waiting status with a resumeAfter timestamp instead of
+    // blocking the event loop with setTimeout. A scheduler service can
+    // poll for waiting executions and resume them at the right time.
+    const delayUntil = new Date(Date.now() + duration);
 
-    return { status: 'completed' };
+    return {
+      status: 'waiting',
+      output: {
+        _delayUntil: delayUntil.toISOString(),
+        _delayDuration: duration,
+        _delayType: 'timer',
+      },
+    };
   }
 }
 
@@ -775,22 +967,59 @@ class ScriptNodeExecutor implements NodeExecutor {
     const config = node.config as ScriptNodeConfig;
 
     try {
-      // Create sandboxed function
-      const fn = new Function('context', 'variables', `
+      // Run user code in an isolated VM sandbox with restricted globals
+      // and a hard timeout to prevent infinite loops / resource exhaustion.
+      const sandbox: Record<string, unknown> = {
+        variables: { ...context.variables },
+        // Provide a safe console stub
+        console: {
+          log: (...args: unknown[]) => { /* no-op in sandbox */ },
+          warn: (...args: unknown[]) => { /* no-op in sandbox */ },
+          error: (...args: unknown[]) => { /* no-op in sandbox */ },
+        },
+        Math,
+        Date,
+        JSON,
+        parseInt,
+        parseFloat,
+        isNaN,
+        isFinite,
+        String,
+        Number,
+        Boolean,
+        Array,
+        Object,
+        // Result placeholder
+        __result: undefined as unknown,
+      };
+
+      const wrappedCode = `
         const { ${Object.keys(context.variables).join(', ')} } = variables;
         ${config.code}
-      `);
+      `;
 
-      const result = fn(context, context.variables);
+      runInNewContext(wrappedCode, sandbox, {
+        timeout: SCRIPT_TIMEOUT_MS,
+        filename: `script-node-${node.id}.js`,
+      });
+
+      const result = sandbox.__result;
 
       return {
         status: 'completed',
-        output: typeof result === 'object' ? result : { _result: result },
+        output: typeof result === 'object' && result !== null
+          ? result as Record<string, unknown>
+          : { _result: result },
       };
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Script error';
+      // Distinguish script timeout from other errors
+      const isTimeout = message.includes('Script execution timed out');
       return {
         status: 'failed',
-        error: error instanceof Error ? error.message : 'Script error',
+        error: isTimeout
+          ? `Script exceeded ${SCRIPT_TIMEOUT_MS}ms timeout`
+          : message,
       };
     }
   }

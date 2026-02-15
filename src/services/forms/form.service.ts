@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '../../utils/prisma.js';
+import { eventBus } from '../events/event-bus';
 import { NotFoundError, ConflictError, BadRequestError } from '../../utils/errors.js';
 import { createLogger } from '../../utils/logger.js';
 import { validateForm } from './validation.service.js';
@@ -500,66 +501,18 @@ export class FormService {
     logger.info({ formId, submissionId: submission.id, accountId }, 'Form submitted');
 
     // =========================================================================
-    // Trigger connected workflows
+    // Emit event — workflow triggering is handled by the event bus listener
+    // in workflow.service.ts (decoupled from form service)
     // =========================================================================
-    // Check if any workflows (Process records) have a form_submission trigger
-    // matching this form ID. If so, start the workflow execution automatically.
-    try {
-      const processes = await prisma.process.findMany({
-        where: {
-          status: 'ACTIVE',
-        },
-      });
-
-      for (const process of processes) {
-        const definition = (process as any).definition as any || {};
-        // Triggers can be stored in two places:
-        // 1. Top-level `triggers` column on the Process model (used by seed scripts)
-        // 2. Inside `definition.triggers` (used by the workflow designer)
-        // Prefer whichever has actual content
-        const topLevelTriggers = Array.isArray((process as any).triggers) ? (process as any).triggers : [];
-        const defTriggers = Array.isArray(definition.triggers) ? definition.triggers : [];
-        const triggers: any[] = topLevelTriggers.length > 0 ? topLevelTriggers : defTriggers;
-
-        const hasFormTrigger = triggers.some(
-          (t: any) => (t.type === 'form_submission' || t.type === 'form') && t.formId === formId
-        );
-
-        if (hasFormTrigger) {
-          logger.info(
-            { formId, processId: process.id, processName: process.name },
-            'Triggering workflow from form submission'
-          );
-
-          try {
-            // Dynamically import to avoid circular dependencies
-            const { workflowService } = await import('../workflow/workflow.service.js');
-            await workflowService.startExecution(
-              process.id,
-              data as Record<string, unknown>,
-              submittedBy || 'system',
-              'form'
-            );
-            logger.info(
-              { formId, processId: process.id },
-              'Workflow execution started from form submission'
-            );
-          } catch (execError) {
-            // Don't fail the submission if workflow trigger fails
-            logger.error(
-              { formId, processId: process.id, error: execError },
-              'Failed to trigger workflow from form submission'
-            );
-          }
-        }
-      }
-    } catch (triggerError) {
-      // Don't fail the submission if trigger lookup fails
-      logger.error(
-        { formId, error: triggerError },
-        'Failed to check for workflow triggers'
-      );
-    }
+    eventBus.emit({
+      type: 'form.submitted',
+      formId,
+      submissionId: submission.id,
+      accountId,
+      data: data as Record<string, unknown>,
+      submittedBy,
+      timestamp: new Date(),
+    });
 
     return { submission, validation };
   }

@@ -5,6 +5,7 @@
 
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { appBuilderService } from '../../services/apps/app-builder.service';
+import { appActionsService } from '../../services/apps/app-actions.service';
 import { componentRegistry } from '../../services/apps/component-registry';
 import { prisma } from '../../utils/prisma.js';
 
@@ -153,6 +154,23 @@ export async function appRoutes(fastify: FastifyInstance) {
     return { success: true };
   });
 
+  /*
+   * POST /api/apps/:id/datasources/resolve
+   * Resolves a workflow-aware data source at runtime and returns live data.
+   * Body: { type: 'tasks' | 'instances' | 'formData', config: { ... } }
+   */
+  fastify.post<{ Params: IdParams; Body: { type: string; config: Record<string, unknown> } }>(
+    '/:id/datasources/resolve',
+    async (request, reply) => {
+      try {
+        const result = await service.resolveDataSource(request.body);
+        return result;
+      } catch (err) {
+        return reply.status(500).send({ error: 'Failed to resolve data source' });
+      }
+    }
+  );
+
   // Theme
   fastify.patch<{ Params: IdParams; Body: any }>('/:id/theme', async (request, reply) => {
     const theme = await service.updateTheme(request.params.id, request.body as any);
@@ -178,6 +196,28 @@ export async function appRoutes(fastify: FastifyInstance) {
     const settings = await service.updatePortalSettings(request.params.id, request.body as any);
     if (!settings) return reply.status(404).send({ error: 'Portal not found' });
     return settings;
+  });
+
+  // App Actions
+  fastify.post<{ Params: IdParams; Body: { type: string; config: Record<string, unknown> } }>(
+    '/:id/actions/execute',
+    async (request, reply) => {
+      const userId = (request as any).user?.id || 'system';
+      try {
+        const result = await appActionsService.execute({
+          ...(request.body as any),
+          userId,
+          appId: request.params.id,
+        });
+        return result;
+      } catch (err) {
+        return reply.status(500).send({ error: 'Action execution failed' });
+      }
+    }
+  );
+
+  fastify.get('/actions/available', async () => {
+    return { actions: appActionsService.getAvailableActions() };
   });
 }
 

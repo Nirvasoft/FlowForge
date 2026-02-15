@@ -11,7 +11,9 @@ import {
     AppWindow,
     Table2,
     Plug,
-    BarChart3
+    BarChart3,
+    Inbox,
+    Activity,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -26,6 +28,8 @@ const navItems = [
     { path: '/forms', icon: FileText, label: 'Forms' },
     { path: '/datasets', icon: Database, label: 'Datasets' },
     { path: '/workflows', icon: GitBranch, label: 'Workflows' },
+    { path: '/tasks', icon: Inbox, label: 'Tasks' },
+    { path: '/processes', icon: Activity, label: 'Processes' },
     { path: '/apps', icon: AppWindow, label: 'Apps' },
     { path: '/decision-tables', icon: Table2, label: 'Decision Tables' },
     { path: '/integrations', icon: Plug, label: 'Integrations' },
