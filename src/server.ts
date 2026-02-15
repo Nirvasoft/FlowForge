@@ -27,6 +27,8 @@ import { appRoutes, componentRoutes } from './api/apps/index.js';
 import { dashboardRoutes, reportRoutes, processAnalyticsRoutes, queryRoutes } from './api/analytics/index.js';
 import { decisionTableRoutes } from './api/decisions/decision-table.routes.js';
 import { auditRoutes } from './api/audit/audit.routes.js';
+import { dashboardStatsRoutes } from './api/dashboard/dashboard.routes.js';
+import { reportsOverviewRoutes } from './api/reports/reports-overview.routes.js';
 import { seedExpenseApprovalTable, seedPOApprovalMatrix, seedTicketRoutingSLA, seedOnboardingEquipmentAccess } from './services/decisions/decision-table.service.js';
 /**
  * Build and configure Fastify server
@@ -143,6 +145,8 @@ async function buildServer() {
   await fastify.register(queryRoutes, { prefix: '/api/v1/query' });
   await fastify.register(decisionTableRoutes, { prefix: '/api/v1/decision-tables' });
   await fastify.register(auditRoutes, { prefix: '/api/v1/audit' });
+  await fastify.register(dashboardStatsRoutes, { prefix: '/api/v1/dashboard' });
+  await fastify.register(reportsOverviewRoutes, { prefix: '/api/v1/reports-overview' });
 
   // ---------- Serve React client when built files exist ----------
   const clientDir = path.join(process.cwd(), 'client', 'dist');
@@ -165,7 +169,9 @@ async function buildServer() {
         return reply.status(404).send({ error: 'Not Found' });
       }
       // Everything else → index.html (React Router handles it)
-      return reply.sendFile('index.html');
+      const indexPath = path.join(clientDir, 'index.html');
+      const html = fs.readFileSync(indexPath, 'utf-8');
+      return reply.type('text/html').send(html);
     });
   } else {
     fastify.setNotFoundHandler(notFoundHandler);

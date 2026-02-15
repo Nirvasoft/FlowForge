@@ -4,9 +4,10 @@
  */
 
 import { get, post, patch, del } from './client';
+import apiClient from './client';
 
 // ============================================================================
-// Dashboard Stats (existing)
+// Dashboard Stats (real API)
 // ============================================================================
 
 export interface DashboardStats {
@@ -14,20 +15,53 @@ export interface DashboardStats {
     activeWorkflows: number;
     formsCreated: number;
     tasksPending: number;
+    totalExecutions: number;
+    runningExecutions: number;
+    datasetsCount: number;
+    decisionTablesCount: number;
+}
+
+export interface RecentActivityItem {
+    id: string;
+    type: 'workflow' | 'task' | 'form' | 'user';
+    title: string;
+    description: string;
+    status?: string;
+    timestamp: string;
+}
+
+export interface PerformanceMetrics {
+    workflowCompletionRate: number;
+    slaComplianceRate: number;
+    avgResolutionHours: number;
+    totalCompletedThisMonth: number;
+    totalFailedThisMonth: number;
+}
+
+export interface DashboardData {
+    stats: DashboardStats;
+    recentActivity: RecentActivityItem[];
+    performance: PerformanceMetrics;
+}
+
+export async function getDashboardData(): Promise<DashboardData> {
+    const response = await apiClient.get<DashboardData>('/dashboard');
+    return response.data;
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-    try {
-        // Mock for now - backend aggregation not available yet
-        return {
-            totalUsers: 156,
-            activeWorkflows: 24,
-            formsCreated: 89,
-            tasksPending: 42,
-        };
-    } catch (error) {
-        return { totalUsers: 0, activeWorkflows: 0, formsCreated: 0, tasksPending: 0 };
-    }
+    const response = await apiClient.get<DashboardStats>('/dashboard/stats');
+    return response.data;
+}
+
+export async function getRecentActivity(limit = 10): Promise<RecentActivityItem[]> {
+    const response = await apiClient.get<RecentActivityItem[]>(`/dashboard/activity?limit=${limit}`);
+    return response.data;
+}
+
+export async function getPerformanceMetrics(): Promise<PerformanceMetrics> {
+    const response = await apiClient.get<PerformanceMetrics>('/dashboard/performance');
+    return response.data;
 }
 
 // ============================================================================
@@ -138,35 +172,75 @@ export interface ReportRun {
 
 export async function listReports(type?: string): Promise<{ reports: Report[] }> {
     const query = type ? `?type=${type}` : '';
-    return get(`/api/analytics/reports${query}`);
+    return get(`/reports${query}`);
 }
 
 export async function getReport(id: string): Promise<Report> {
-    return get(`/api/analytics/reports/${id}`);
+    return get(`/reports/${id}`);
 }
 
 export async function createReport(data: Partial<Report>): Promise<Report> {
-    return post('/api/analytics/reports', data);
+    return post('/reports', data);
 }
 
 export async function updateReport(id: string, data: Partial<Report>): Promise<Report> {
-    return patch(`/api/analytics/reports/${id}`, data);
+    return patch(`/reports/${id}`, data);
 }
 
 export async function deleteReport(id: string): Promise<{ success: boolean }> {
-    return del(`/api/analytics/reports/${id}`);
+    return del(`/reports/${id}`);
 }
 
 export async function generateReport(id: string, format: ReportFormat): Promise<ReportRun> {
-    return post(`/api/analytics/reports/${id}/generate`, { format });
+    return post(`/reports/${id}/generate`, { format });
 }
 
 export async function getReportRuns(id: string): Promise<{ runs: ReportRun[] }> {
-    return get(`/api/analytics/reports/${id}/runs`);
+    return get(`/reports/${id}/runs`);
 }
 
 export async function setReportSchedule(id: string, schedule: ReportSchedule): Promise<Report> {
-    return post(`/api/analytics/reports/${id}/schedule`, schedule);
+    return post(`/reports/${id}/schedule`, schedule);
+}
+
+// ============================================================================
+// Reports Overview (real-time analytics)
+// ============================================================================
+
+export interface OverviewStats {
+    totalWorkflows: number;
+    tasksCompleted: number;
+    pendingApprovals: number;
+    avgCompletionHours: number;
+}
+
+export interface WorkflowTrendItem {
+    month: string;
+    completed: number;
+    failed: number;
+}
+
+export interface TaskDistributionItem {
+    name: string;
+    value: number;
+    color: string;
+}
+
+export interface FormRankingItem {
+    form: string;
+    count: number;
+}
+
+export interface ReportsOverviewData {
+    stats: OverviewStats;
+    workflowTrend: WorkflowTrendItem[];
+    taskDistribution: TaskDistributionItem[];
+    formRankings: FormRankingItem[];
+}
+
+export async function getReportsOverview(): Promise<ReportsOverviewData> {
+    const response = await apiClient.get<ReportsOverviewData>('/reports-overview');
+    return response.data;
 }
 
 // ============================================================================
