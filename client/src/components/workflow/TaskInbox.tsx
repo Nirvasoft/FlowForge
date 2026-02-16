@@ -56,6 +56,9 @@ import {
     Shield,
     ArrowUpDown,
     SquareCheck,
+    Paperclip,
+    UserCircle2,
+    Plane,
 } from 'lucide-react';
 import {
     Button,
@@ -128,6 +131,26 @@ const isDateValue = (key: string, value: unknown): boolean => {
 const isPartyField = (key: string): boolean => {
     const partyKeys = ['vendor', 'supplier', 'client', 'party', 'owner', 'manager', 'contact', 'assignee', 'requestor', 'approver'];
     return partyKeys.some(k => key.toLowerCase().includes(k));
+};
+
+/** Detect attachment/file fields */
+const isAttachmentField = (key: string, value: unknown): boolean => {
+    const attachKeys = ['attach', 'file', 'document', 'report', 'upload', 'pdf'];
+    if (attachKeys.some(k => key.toLowerCase().includes(k))) return true;
+    if (typeof value === 'string' && /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|csv|zip|png|jpg)$/i.test(value)) return true;
+    return false;
+};
+
+/** Detect employee/initiator/person name fields */
+const isEmployeeField = (key: string): boolean => {
+    const empKeys = ['initiator', 'employee', 'name', 'fullname', 'submitter', 'applicant', 'traveler'];
+    return empKeys.some(k => key.toLowerCase().includes(k)) && !key.toLowerCase().includes('company');
+};
+
+/** Detect travel/trip date pair fields */
+const isTravelField = (key: string): boolean => {
+    const travelKeys = ['arrival', 'departure', 'trip', 'travel', 'flight', 'dispatched', 'destination', 'scope'];
+    return travelKeys.some(k => key.toLowerCase().includes(k));
 };
 
 /** Format a monetary value */
@@ -495,33 +518,47 @@ export function TaskInbox({
                     const isMoney = isMonetary(key, value);
                     const isDate = isDateValue(key, value);
                     const isParty = isPartyField(key);
+                    const isAttach = isAttachmentField(key, value);
+                    const isEmployee = !isParty && isEmployeeField(key);
+                    const isTravel = !isDate && isTravelField(key);
                     const displayValue = isMoney
                         ? formatCurrency(value as number)
                         : isDate
                             ? formatDate(value as string)
-                            : Array.isArray(value)
-                                ? value.join(', ')
-                                : typeof value === 'object'
-                                    ? JSON.stringify(value)
-                                    : String(value);
+                            : isAttach && typeof value === 'string'
+                                ? `📎 ${value}`
+                                : Array.isArray(value)
+                                    ? value.join(', ')
+                                    : typeof value === 'object'
+                                        ? JSON.stringify(value)
+                                        : String(value);
                     const checkId = `${taskId}:${key}`;
                     const isChecked = checkedRequirements.has(checkId);
 
                     // Context-aware icon
                     const ValueIcon = isMoney ? DollarSign
-                        : isDate ? Calendar
-                            : isParty ? Shield
-                                : typeof value === 'number' ? Hash : Tag;
+                        : isAttach ? Paperclip
+                            : isEmployee ? UserCircle2
+                                : isTravel ? Plane
+                                    : isDate ? Calendar
+                                        : isParty ? Shield
+                                            : typeof value === 'number' ? Hash : Tag;
 
                     const valueColor = isMoney ? 'text-emerald-400'
-                        : isDate ? 'text-blue-400'
-                            : isParty ? 'text-violet-400'
-                                : 'text-surface-500';
+                        : isAttach ? 'text-amber-400'
+                            : isEmployee ? 'text-cyan-400'
+                                : isTravel ? 'text-sky-400'
+                                    : isDate ? 'text-blue-400'
+                                        : isParty ? 'text-violet-400'
+                                            : 'text-surface-500';
 
                     const textColor = isMoney ? 'text-emerald-300 font-semibold'
-                        : isDate ? 'text-blue-300'
-                            : isParty ? 'text-violet-300 font-medium'
-                                : 'text-surface-200';
+                        : isAttach ? 'text-amber-300 underline'
+                            : isEmployee ? 'text-cyan-300 font-medium'
+                                : isTravel ? 'text-sky-300'
+                                    : isDate ? 'text-blue-300'
+                                        : isParty ? 'text-violet-300 font-medium'
+                                            : 'text-surface-200';
 
                     return (
                         <div
@@ -531,9 +568,12 @@ export function TaskInbox({
                                 isChecked
                                     ? 'bg-green-500/5 border border-green-500/20'
                                     : isMoney ? 'bg-emerald-500/5 border border-emerald-500/10 hover:border-emerald-500/30'
-                                        : isDate ? 'bg-blue-500/5 border border-blue-500/10 hover:border-blue-500/30'
-                                            : isParty ? 'bg-violet-500/5 border border-violet-500/10 hover:border-violet-500/30'
-                                                : 'bg-surface-800/30 border border-surface-700/30 hover:border-surface-600/50'
+                                        : isAttach ? 'bg-amber-500/5 border border-amber-500/10 hover:border-amber-500/30'
+                                            : isEmployee ? 'bg-cyan-500/5 border border-cyan-500/10 hover:border-cyan-500/30'
+                                                : isTravel ? 'bg-sky-500/5 border border-sky-500/10 hover:border-sky-500/30'
+                                                    : isDate ? 'bg-blue-500/5 border border-blue-500/10 hover:border-blue-500/30'
+                                                        : isParty ? 'bg-violet-500/5 border border-violet-500/10 hover:border-violet-500/30'
+                                                            : 'bg-surface-800/30 border border-surface-700/30 hover:border-surface-600/50'
                             )}
                             onClick={() => interactive && toggleRequirement(taskId, key)}
                         >
