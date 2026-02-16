@@ -6,23 +6,23 @@ import { dashboardStatsService } from '../../services/dashboard/dashboard.servic
 
 export async function dashboardStatsRoutes(fastify: FastifyInstance) {
     // GET / – Full dashboard data (stats + activity + performance)
-    fastify.get('/', async () => {
-        return dashboardStatsService.getDashboard();
+    fastify.get('/', async (request) => {
+        return dashboardStatsService.getDashboard(request.accountId!);
     });
 
     // GET /stats – Just the stat cards
-    fastify.get('/stats', async () => {
-        return dashboardStatsService.getStats();
+    fastify.get('/stats', async (request) => {
+        return dashboardStatsService.getStats(request.accountId!);
     });
 
     // GET /activity – Recent activity feed
     fastify.get('/activity', async (request) => {
         const { limit } = request.query as { limit?: string };
-        return dashboardStatsService.getRecentActivity(limit ? parseInt(limit, 10) : 10);
+        return dashboardStatsService.getRecentActivity(request.accountId!, limit ? parseInt(limit, 10) : 10);
     });
 
     // GET /performance – Performance metrics
-    fastify.get('/performance', async () => {
-        return dashboardStatsService.getPerformance();
+    fastify.get('/performance', async (request) => {
+        return dashboardStatsService.getPerformance(request.accountId!);
     });
 }
