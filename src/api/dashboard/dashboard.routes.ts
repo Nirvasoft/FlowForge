@@ -3,8 +3,12 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { dashboardStatsService } from '../../services/dashboard/dashboard.service.js';
+import { authenticate } from '../../middleware/auth.js';
 
 export async function dashboardStatsRoutes(fastify: FastifyInstance) {
+    // All dashboard routes require authentication (for accountId scoping)
+    fastify.addHook('onRequest', authenticate);
+
     // GET / – Full dashboard data (stats + activity + performance)
     fastify.get('/', async (request) => {
         return dashboardStatsService.getDashboard(request.accountId!);

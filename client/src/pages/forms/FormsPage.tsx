@@ -35,6 +35,7 @@ const statusVariants: Record<Form['status'], 'success' | 'warning' | 'info'> = {
 export function FormsPage() {
     const navigate = useNavigate();
     const [forms, setForms] = useState<Form[]>([]);
+    const [totalCount, setTotalCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [isLoading, setIsLoading] = useState(true);
@@ -50,10 +51,12 @@ export function FormsPage() {
             setIsLoading(true);
             setError(null);
             const response = await listForms({
+                limit: 100,
                 status: statusFilter !== 'all' ? statusFilter as Form['status'] : undefined,
                 search: searchQuery || undefined,
             });
             setForms(response.items);
+            setTotalCount(response.total);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load forms');
         } finally {
@@ -149,7 +152,7 @@ export function FormsPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-surface-100">Forms</h1>
-                    <p className="mt-1 text-surface-400">Create and manage data collection forms</p>
+                    <p className="mt-1 text-surface-400">Create and manage data collection forms — {totalCount} forms</p>
                 </div>
                 <Button onClick={() => navigate('/forms/new')}>
                     <Plus className="h-4 w-4" />

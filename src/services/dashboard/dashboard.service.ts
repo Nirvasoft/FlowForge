@@ -42,27 +42,67 @@ export interface DashboardData {
 
 // ── Service ──────────────────────────────────────────────────────────────────
 
+/**
+ * Resolve the effective accountId for dashboard queries.
+ * If the user's own account has minimal data (< 2 users), fall back to the
+ * demo account so the dashboard matches what list pages display (they also
+ * merge/fallback to demo data).
+ */
+async function resolveAccountId(accountId: string): Promise<string> {
+    const userCount = await prisma.user.count({ where: { accountId } });
+    if (userCount > 1) return accountId;
+
+    // Try demo account
+    const demo = await prisma.account.findFirst({ where: { slug: 'demo' } });
+    if (demo) return demo.id;
+    return accountId;
+}
+
 async function getStats(accountId: string): Promise<DashboardStats> {
+    const effectiveId = await resolveAccountId(accountId);
+
+    // ── Users: mirror user.routes fallback logic ──
+    // If user's own account has <= 1 user, merge with demo account (same as user list page)
+    let totalUsers = await prisma.user.count({ where: { accountId } });
+    if (totalUsers <= 1) {
+        const demoAccount = await prisma.account.findFirst({ where: { slug: 'demo' } });
+        if (demoAccount && demoAccount.id !== accountId) {
+            const demoUsers = await prisma.user.count({ where: { accountId: demoAccount.id } });
+            totalUsers = totalUsers + demoUsers;
+        }
+    }
+
+    // ── Datasets: check in-memory service first (same as dataset.routes) ──
+    let datasetsCount: number;
+    try {
+        const { datasetService } = await import('../datasets/dataset.service.js');
+        const inMemory = await datasetService.listDatasets({});
+        if (inMemory.data && inMemory.data.length > 0) {
+            datasetsCount = inMemory.total || inMemory.data.length;
+        } else {
+            datasetsCount = await prisma.dataset.count({ where: { accountId: effectiveId } });
+        }
+    } catch {
+        datasetsCount = await prisma.dataset.count({ where: { accountId: effectiveId } });
+    }
+
+    // ── Other stats: use effective (demo-fallback) account ──
     const [
-        totalUsers,
         activeWorkflows,
         formsCreated,
         tasksPending,
         totalExecutions,
         runningExecutions,
-        datasetsCount,
     ] = await Promise.all([
-        prisma.user.count({ where: { accountId } }),
-        prisma.process.count({ where: { accountId, status: 'ACTIVE' } }),
-        prisma.form.count({ where: { accountId } }),
-        prisma.taskInstance.count({ where: { status: 'PENDING', instance: { process: { accountId } } } }),
-        prisma.processInstance.count({ where: { process: { accountId } } }),
-        prisma.processInstance.count({ where: { status: 'RUNNING', process: { accountId } } }),
-        prisma.dataset.count({ where: { accountId } }),
+        prisma.process.count({ where: { accountId: effectiveId, status: 'ACTIVE' } }),
+        prisma.form.count({ where: { accountId: effectiveId } }),
+        prisma.taskInstance.count({ where: { status: 'PENDING', instance: { process: { accountId: effectiveId } } } }),
+        prisma.processInstance.count({ where: { process: { accountId: effectiveId } } }),
+        prisma.processInstance.count({ where: { status: 'RUNNING', process: { accountId: effectiveId } } }),
     ]);
 
     // Count decision tables for this account
-    const decisionTablesCount = await prisma.decisionTable.count({ where: { accountId } }).catch(() => 0);
+    const decisionTablesCount = await prisma.decisionTable.count({ where: { accountId: effectiveId } }).catch(() => 0);
 
     return {
         totalUsers,
@@ -77,11 +117,12 @@ async function getStats(accountId: string): Promise<DashboardStats> {
 }
 
 async function getRecentActivity(accountId: string, limit = 10): Promise<RecentActivityItem[]> {
+    const effectiveId = await resolveAccountId(accountId);
     const items: RecentActivityItem[] = [];
 
     // Recent process instances
     const recentInstances = await prisma.processInstance.findMany({
-        where: { process: { accountId } },
+        where: { process: { accountId: effectiveId } },
         orderBy: { startedAt: 'desc' },
         take: limit,
         include: {
@@ -108,7 +149,7 @@ async function getRecentActivity(accountId: string, limit = 10): Promise<RecentA
 
     // Recent tasks
     const recentTasks = await prisma.taskInstance.findMany({
-        where: { instance: { process: { accountId } } },
+        where: { instance: { process: { accountId: effectiveId } } },
         orderBy: { createdAt: 'desc' },
         take: limit,
         include: {
@@ -134,7 +175,7 @@ async function getRecentActivity(accountId: string, limit = 10): Promise<RecentA
 
     // Recent form submissions
     const recentSubmissions = await prisma.formSubmission.findMany({
-        where: { form: { accountId } },
+        where: { form: { accountId: effectiveId } },
         orderBy: { createdAt: 'desc' },
         take: limit,
         include: {
@@ -169,6 +210,7 @@ async function getRecentActivity(accountId: string, limit = 10): Promise<RecentA
 }
 
 async function getPerformance(accountId: string): Promise<PerformanceMetrics> {
+    const effectiveId = await resolveAccountId(accountId);
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -180,16 +222,16 @@ async function getPerformance(accountId: string): Promise<PerformanceMetrics> {
         totalTasks,
         slaBreachedTasks,
     ] = await Promise.all([
-        prisma.processInstance.count({ where: { process: { accountId } } }),
-        prisma.processInstance.count({ where: { status: 'COMPLETED', process: { accountId } } }),
+        prisma.processInstance.count({ where: { process: { accountId: effectiveId } } }),
+        prisma.processInstance.count({ where: { status: 'COMPLETED', process: { accountId: effectiveId } } }),
         prisma.processInstance.count({
-            where: { status: 'COMPLETED', completedAt: { gte: startOfMonth }, process: { accountId } },
+            where: { status: 'COMPLETED', completedAt: { gte: startOfMonth }, process: { accountId: effectiveId } },
         }),
         prisma.processInstance.count({
-            where: { status: 'FAILED', completedAt: { gte: startOfMonth }, process: { accountId } },
+            where: { status: 'FAILED', completedAt: { gte: startOfMonth }, process: { accountId: effectiveId } },
         }),
-        prisma.taskInstance.count({ where: { instance: { process: { accountId } } } }),
-        prisma.taskInstance.count({ where: { slaBreached: true, instance: { process: { accountId } } } }),
+        prisma.taskInstance.count({ where: { instance: { process: { accountId: effectiveId } } } }),
+        prisma.taskInstance.count({ where: { slaBreached: true, instance: { process: { accountId: effectiveId } } } }),
     ]);
 
     // Avg resolution: completed tasks this month
@@ -197,7 +239,7 @@ async function getPerformance(accountId: string): Promise<PerformanceMetrics> {
         where: {
             status: 'COMPLETED',
             completedAt: { gte: startOfMonth },
-            instance: { process: { accountId } },
+            instance: { process: { accountId: effectiveId } },
         },
         select: { createdAt: true, completedAt: true },
     });

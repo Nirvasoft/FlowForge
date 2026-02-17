@@ -24,6 +24,7 @@ const statusVariants: Record<User['status'], 'success' | 'warning' | 'error' | '
 
 export function UsersPage() {
     const [users, setUsers] = useState<User[]>([]);
+    const [totalCount, setTotalCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [isLoading, setIsLoading] = useState(true);
@@ -37,10 +38,12 @@ export function UsersPage() {
             setIsLoading(true);
             setError(null);
             const response = await listUsers({
+                limit: 100,
                 status: statusFilter !== 'all' ? statusFilter as User['status'] : undefined,
                 search: searchQuery || undefined,
             });
             setUsers(response.items);
+            setTotalCount(response.total);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load users');
         } finally {
@@ -152,7 +155,7 @@ export function UsersPage() {
 
             {/* Users table */}
             <Card>
-                <CardHeader title={`${filteredUsers.length} users`} />
+                <CardHeader title={`${totalCount} users`} />
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>

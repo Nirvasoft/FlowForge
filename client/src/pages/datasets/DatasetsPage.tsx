@@ -43,6 +43,7 @@ function getColumnCount(schema: Record<string, unknown> | DatasetColumn[]): numb
 export function DatasetsPage() {
     const navigate = useNavigate();
     const [datasets, setDatasets] = useState<Dataset[]>([]);
+    const [totalCount, setTotalCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [_error, setError] = useState<string | null>(null);
@@ -61,9 +62,11 @@ export function DatasetsPage() {
             setIsLoading(true);
             setError(null);
             const response = await listDatasets({
+                limit: 100,
                 search: searchQuery || undefined,
             });
             setDatasets(response.items);
+            setTotalCount(response.total);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load datasets');
         } finally {
@@ -151,7 +154,7 @@ export function DatasetsPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-surface-100">Datasets</h1>
-                    <p className="mt-1 text-surface-400">Manage your data tables and records</p>
+                    <p className="mt-1 text-surface-400">Manage your data tables and records — {totalCount} datasets</p>
                 </div>
                 <div className="flex gap-2">
                     <Button variant="secondary" onClick={() => datasets.length > 0 && setImportingDataset(datasets[0])}>
