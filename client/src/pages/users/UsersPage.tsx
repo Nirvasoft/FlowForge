@@ -9,7 +9,8 @@ import {
     Badge,
     Avatar,
     Modal,
-    ModalFooter
+    ModalFooter,
+    Pagination
 } from '../../components/ui';
 import { cn } from '../../lib/utils';
 import { listUsers, createUser, updateUserStatus, deleteUser, resendInvitation } from '../../api/users';
@@ -25,6 +26,9 @@ const statusVariants: Record<User['status'], 'success' | 'warning' | 'error' | '
 export function UsersPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [totalCount, setTotalCount] = useState(0);
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(20);
+    const [totalPages, setTotalPages] = useState(1);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [isLoading, setIsLoading] = useState(true);
@@ -38,32 +42,40 @@ export function UsersPage() {
             setIsLoading(true);
             setError(null);
             const response = await listUsers({
-                limit: 100,
+                page,
+                limit,
                 status: statusFilter !== 'all' ? statusFilter as User['status'] : undefined,
                 search: searchQuery || undefined,
             });
             setUsers(response.items);
             setTotalCount(response.total);
+            setTotalPages(response.totalPages);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load users');
         } finally {
             setIsLoading(false);
         }
-    }, [statusFilter, searchQuery]);
+    }, [statusFilter, searchQuery, page, limit]);
 
     useEffect(() => {
         loadUsers();
     }, [loadUsers]);
 
-    // Filter users (client-side for additional filtering if API search is partial)
-    const filteredUsers = users.filter((user) => {
-        const matchesSearch =
-            user.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.email.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
-        return matchesSearch && matchesStatus;
-    });
+    // Reset to page 1 when filters change
+    const handleSearchChange = (value: string) => {
+        setSearchQuery(value);
+        setPage(1);
+    };
+
+    const handleStatusFilterChange = (status: string) => {
+        setStatusFilter(status);
+        setPage(1);
+    };
+
+    const handleLimitChange = (newLimit: number) => {
+        setLimit(newLimit);
+        setPage(1);
+    };
 
     const handleStatusChange = async (userId: string, newStatus: User['status']) => {
         try {
@@ -129,7 +141,7 @@ export function UsersPage() {
                             <Input
                                 placeholder="Search users..."
                                 value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onChange={(e) => handleSearchChange(e.target.value)}
                                 leftIcon={<Search className="h-4 w-4" />}
                             />
                         </div>
@@ -137,7 +149,7 @@ export function UsersPage() {
                             {['all', 'ACTIVE', 'PENDING', 'INACTIVE', 'SUSPENDED'].map((status) => (
                                 <button
                                     key={status}
-                                    onClick={() => setStatusFilter(status)}
+                                    onClick={() => handleStatusFilterChange(status)}
                                     className={cn(
                                         'px-3 py-2 text-sm font-medium rounded-lg transition-colors',
                                         statusFilter === status
@@ -184,14 +196,14 @@ export function UsersPage() {
                                         Loading users...
                                     </td>
                                 </tr>
-                            ) : filteredUsers.length === 0 ? (
+                            ) : users.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="px-6 py-12 text-center text-surface-400">
                                         No users found
                                     </td>
                                 </tr>
                             ) : (
-                                filteredUsers.map((user) => (
+                                users.map((user) => (
                                     <tr
                                         key={user.id}
                                         className="hover:bg-surface-800/30 transition-colors"
@@ -273,6 +285,14 @@ export function UsersPage() {
                         </tbody>
                     </table>
                 </div>
+                <Pagination
+                    page={page}
+                    totalPages={totalPages}
+                    total={totalCount}
+                    limit={limit}
+                    onPageChange={setPage}
+                    onLimitChange={handleLimitChange}
+                />
             </Card>
 
             {/* Add User Modal */}
