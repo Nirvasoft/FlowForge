@@ -32,7 +32,7 @@ async function fixDatasetRecords() {
         const ds = await prisma.dataset.findFirst({ where: { accountId: account.id, name } });
         if (!ds) return;
         const actual = await prisma.datasetRecord.count({ where: { datasetId: ds.id } });
-        if (ds.rowCount !== actual) {
+        if (Number(ds.rowCount) !== actual) {
             await prisma.dataset.update({ where: { id: ds.id }, data: { rowCount: actual } });
             console.log(`  🔄 ${name}: rowCount ${ds.rowCount} → ${actual}`);
         }
@@ -131,7 +131,7 @@ async function fixDatasetRecords() {
     const allDs = await prisma.dataset.findMany({ where: { accountId: account.id }, orderBy: { name: 'asc' } });
     for (const ds of allDs) {
         const actual = await prisma.datasetRecord.count({ where: { datasetId: ds.id } });
-        const status = ds.rowCount === actual && actual > 0 ? '✅' : actual === 0 ? '❌ EMPTY' : '⚠️ MISMATCH';
+        const status = Number(ds.rowCount) === actual && actual > 0 ? '✅' : actual === 0 ? '❌ EMPTY' : '⚠️ MISMATCH';
         console.log(`  ${status} ${ds.name}: rowCount=${ds.rowCount}, actual=${actual}`);
     }
 
