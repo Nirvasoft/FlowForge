@@ -328,7 +328,19 @@ async function seedBusinessTrip() {
         }
     });
 
-    console.log(`✅ Created 4 process instances with task instances\n`);
+    // Create form submissions for all instances
+    for (const inst of [inst1, inst2, inst3, inst4]) {
+        const vars = inst.variables as any;
+        await prisma.formSubmission.create({
+            data: {
+                formId: btForm.id,
+                data: vars,
+                createdBy: inst.startedBy,
+            },
+        });
+    }
+
+    console.log(`✅ Created 4 process instances with task instances and form submissions\n`);
 
     // ========================================================================
     // 6. APPLICATION
