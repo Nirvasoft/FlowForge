@@ -342,6 +342,17 @@ async function seedBusinessTrip() {
 
     console.log(`✅ Created 4 process instances with task instances and form submissions\n`);
 
+    // Create approval form submissions for completed approvals
+    // Instance 1: Manager and Director both approved
+    await prisma.formSubmission.create({
+        data: { formId: approvalForm.id, data: { decision: 'approve', comments: 'Trip report reviewed. All expenses within policy.' }, createdBy: hiroshi.id },
+    });
+    await prisma.formSubmission.create({
+        data: { formId: approvalForm.id, data: { decision: 'approve', comments: 'Approved. Network inspection was necessary and well-documented.' }, createdBy: kenji.id },
+    });
+
+    console.log(`✅ Created 2 approval form submissions\n`);
+
     // ========================================================================
     // 6. APPLICATION
     // ========================================================================

@@ -456,6 +456,17 @@ async function seedBusinessCard() {
 
     console.log(`✅ Created 5 process instances with task instances and form submissions\n`);
 
+    // Create approval form submissions for completed approvals
+    // Instance 1: DGM approved, Director approved, Print completed
+    await prisma.formSubmission.create({
+        data: { formId: approvalForm.id, data: { decision: 'approve', comments: 'Approved. Standard card order for engineer.' }, createdBy: hanMyint.id },
+    });
+    await prisma.formSubmission.create({
+        data: { formId: approvalForm.id, data: { decision: 'approve', comments: 'Cards approved for Aung Min.' }, createdBy: suLwin.id },
+    });
+
+    console.log(`✅ Created 2 approval form submissions\n`);
+
     // ========================================================================
     // 7. APPLICATION
     // ========================================================================
