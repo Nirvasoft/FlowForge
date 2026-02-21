@@ -1,0 +1,1924 @@
+{
+    "Id": "ProcessDef_SaXT0wX3Zo",
+    "Kind": "ProcessDef",
+    "WorkflowType": "Sequence",
+    "Model": "Contract_Management",
+    "ProcessDef::Activity": [
+        {
+            "Id": "Activity_c8AoJCRS80",
+            "Kind": "Activity",
+            "NodeType": "StartEvent",
+            "Name": "Start",
+            "ProcessDef": "ProcessDef_SaXT0wX3Zo",
+            "Activity::Permission": [
+                "Permission_e6GVFQ37Z",
+                "Permission__GRS1jnYi",
+                "Permission_ZJUNSpeg3",
+                "Permission_1jbNmveBA",
+                "Permission_ElezGz4Kk",
+                "Permission_0FDilCNl4",
+                "Permission_6NcP_i4AD",
+                "Permission_2rfXp-6sv",
+                "Permission_K0it7mrUp",
+                "Permission_y4Ee_o93I"
+            ],
+            "ActivityDefaultSLA::SLA": [],
+            "Activity::Resource": [],
+            "Activity::Expression": []
+        },
+        {
+            "Id": "Activity_KzsCizsw4",
+            "Kind": "Activity",
+            "NodeType": "UserTask",
+            "ProcessDef": "ProcessDef_SaXT0wX3Zo",
+            "Name": "Initiate",
+            "Activity::Resource": [
+                {
+                    "Id": "Resource_CHEtwhwLQ",
+                    "Kind": "Resource",
+                    "ValueType": "User",
+                    "DisplayValue": "Moh Moh Than",
+                    "Value": "Us5LimpgotL7",
+                    "Activity": "Activity_KzsCizsw4"
+                },
+                {
+                    "Id": "Resource_2nNITcnsp",
+                    "Kind": "Resource",
+                    "ValueType": "User",
+                    "DisplayValue": "Yin Thu Thu Htet",
+                    "Value": "Us5LinJsGol4",
+                    "Activity": "Activity_KzsCizsw4"
+                }
+            ],
+            "Activity::Expression": [
+                {
+                    "Id": "Expression_r0niSE_cX",
+                    "Kind": "Expression",
+                    "ExpressionStr": "Generated_Contract_Number=\"aaaaaaaaa1111\"",
+                    "Activity": "Activity_KzsCizsw4",
+                    "Expression::Node": [
+                        "Node_4Qs79iIOiF"
+                    ]
+                }
+            ],
+            "Activity::Permission": [
+                "Permission_2Lt2xayq0"
+            ],
+            "ActivityDefaultSLA::SLA": []
+        },
+        {
+            "Id": "Activity_e2jMysblp",
+            "Kind": "Activity",
+            "NodeType": "GotoTask",
+            "ProcessDef": "ProcessDef_SaXT0wX3Zo",
+            "Goto": "Activity_Hg39ej_Mv|Active",
+            "Name": "Goto-Active",
+            "Activity::Expression": [
+                {
+                    "Id": "Expression_V0Od6-ndx",
+                    "Kind": "Expression",
+                    "ExpressionStr": "Generated_Contract_Number=\"aaaaaaaa\"",
+                    "Activity": "Activity_e2jMysblp",
+                    "Expression::Node": [
+                        "Node_ftDa-jzAgD"
+                    ]
+                }
+            ],
+            "ActivityDefaultSLA::SLA": [],
+            "Activity::Resource": []
+        },
+        {
+            "Id": "Activity_a69WuG-f1",
+            "Kind": "Activity",
+            "NodeType": "UserTask",
+            "ProcessDef": "ProcessDef_SaXT0wX3Zo",
+            "Name": "Draft",
+            "Activity::Resource": [
+                {
+                    "Id": "Resource_gpFzioabS",
+                    "Kind": "Resource",
+                    "ValueType": "Field",
+                    "DisplayValue": "Creator Group",
+                    "Field": "Creator_Group",
+                    "Activity": "Activity_a69WuG-f1"
+                },
+                {
+                    "Id": "Resource_SgrbGIagh",
+                    "Kind": "Resource",
+                    "ValueType": "Expression",
+                    "Activity": "Activity_a69WuG-f1",
+                    "Resource::Expression": [
+                        "Expression_9ETSXmhZv"
+                    ],
+                    "DisplayValue": "userandgroup(Contract_Creator_Group)"
+                }
+            ],
+            "Goto::Activity": [
+                "Activity_9yvY7zki-",
+                "Activity_mZZhxqNl8"
+            ],
+            "Activity::Permission": [
+                "Permission_rF3KRehDR",
+                "Permission_fR1Mp1CqO",
+                "Permission_cZvWdiqpb",
+                "Permission_S9JafecK4",
+                "Permission_hj_EREc57",
+                "Permission_Ntpgmzy0P",
+                "Permission_FpaAd4SWJ",
+                "Permission_2PqWSdW8m",
+                "Permission_gbyG2AOBd",
+                "Permission_InXC4aItpJ",
+                "Permission_baAMH4ELv",
+                "Permission_vOosvOlke",
+                "Permission_ywdrprQMr",
+                "Permission_1f029R7JI",
+                "Permission_ngAwj1bLI",
+                "Permission_31nF2_JRD",
+                "Permission_9PGtSBhUg",
+                "Permission_XuoLh3FzB",
+                "Permission_VFEe5CqUM",
+                "Permission_8cbbKEQOK",
+                "Permission_Y9_W2PjS6",
+                "Permission_2MVGINuSZ",
+                "Permission_RKFgtro1f"
+            ],
+            "Activity::Expression": [
+                {
+                    "Id": "Expression_jq1oAeVRc",
+                    "Kind": "Expression",
+                    "ExpressionStr": "Cancel_Contract_btn=false()",
+                    "Activity": "Activity_a69WuG-f1",
+                    "Expression::Node": [
+                        "Node_BhNGKvfWCa"
+                    ]
+                }
+            ],
+            "ActivityDefaultSLA::SLA": []
+        },
+        {
+            "Id": "Activity_J-45vu7Wq",
+            "Kind": "Activity",
+            "Name": "ParallelActivity2",
+            "NodeType": "Parallel",
+            "ProcessDef": "ProcessDef_SaXT0wX3Zo",
+            "Activity::ProcessDef": [
+                {
+                    "Id": "ProcessDef_J_bEKkS6sJ",
+                    "Kind": "ProcessDef",
+                    "Activity": "Activity_J-45vu7Wq",
+                    "Name": "Draft",
+                    "ProcessDef::Activity": [
+                        {
+                            "Id": "Activity_YFc1KnGAQ",
+                            "Kind": "Activity",
+                            "NodeType": "UserTask",
+                            "ProcessDef": "ProcessDef_J_bEKkS6sJ",
+                            "Name": "Submit For Review",
+                            "Activity::Permission": [
+                                "Permission_qohs1YQwy",
+                                "Permission_1AecoNB49",
+                                "Permission_hekBbdNsW",
+                                "Permission_csCnl50sT",
+                                "Permission_yJ026efCR",
+                                "Permission_S9AOaVLEH",
+                                "Permission_1DJt7Jz86",
+                                "Permission_2jmQBvbm4",
+                                "Permission_32-UND2qE",
+                                "Permission_g7WuALi3T",
+                                "Permission_iJnzodnFg",
+                                "Permission_atw1BNVKL",
+                                "Permission_qGTUt7Zxj",
+                                "Permission_HOSy--mKt",
+                                "Permission_C6h9zW3pA",
+                                "Permission_JKz8XtFcW",
+                                "Permission_LDz5LBInw"
+                            ],
+                            "Goto::Activity": [
+                                "Activity_OxpmCnqQZ"
+                            ],
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_sHry4RzPl",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "Cancel_Contract_btn=false()",
+                                    "Activity": "Activity_YFc1KnGAQ",
+                                    "Expression::Node": [
+                                        "Node_TtNgcMuFTN"
+                                    ]
+                                }
+                            ],
+                            "Activity::Resource": [
+                                {
+                                    "Id": "Resource_-uUNw8AgD",
+                                    "Kind": "Resource",
+                                    "ValueType": "Expression",
+                                    "Activity": "Activity_YFc1KnGAQ",
+                                    "Resource::Expression": [
+                                        "Expression_iPAM4QtYh"
+                                    ],
+                                    "DisplayValue": "userandgroup(Login_Approver_Group)"
+                                },
+                                {
+                                    "Id": "Resource_Cjvn6tWz3",
+                                    "Kind": "Resource",
+                                    "ValueType": "Field",
+                                    "DisplayValue": "Approver Group",
+                                    "Field": "Approver_Group",
+                                    "Activity": "Activity_YFc1KnGAQ"
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": []
+                        },
+                        {
+                            "Id": "Activity_5lS6n0i2W",
+                            "Kind": "Activity",
+                            "Name": "ParallelActivity1",
+                            "NodeType": "Parallel",
+                            "ProcessDef": "ProcessDef_J_bEKkS6sJ",
+                            "Activity::ProcessDef": [
+                                {
+                                    "Id": "ProcessDef_hgq5mp06fE",
+                                    "Kind": "ProcessDef",
+                                    "Name": "Draft Approve",
+                                    "Activity": "Activity_5lS6n0i2W",
+                                    "ProcessDef::Activity": [
+                                        {
+                                            "Id": "Activity_mMAu9MfBI",
+                                            "Kind": "Activity",
+                                            "NodeType": "UserTask",
+                                            "ProcessDef": "ProcessDef_hgq5mp06fE",
+                                            "Name": "Approved",
+                                            "Activity::Resource": [
+                                                {
+                                                    "Id": "Resource_Yku7LUUMh",
+                                                    "Kind": "Resource",
+                                                    "ValueType": "Field",
+                                                    "DisplayValue": "Created by",
+                                                    "Field": "_created_by",
+                                                    "Activity": "Activity_mMAu9MfBI"
+                                                }
+                                            ],
+                                            "Activity::Permission": [
+                                                "Permission_wXQpx0TJH",
+                                                "Permission_JDJuooMZU",
+                                                "Permission_v6MDGu1p1",
+                                                "Permission_SbzqEGaDT"
+                                            ],
+                                            "Activity::Expression": [
+                                                {
+                                                    "Id": "Expression_Ou2moM4vZ",
+                                                    "Kind": "Expression",
+                                                    "ExpressionStr": "AND(Approving=\"Aesssssssss\",Cancel_Contract_btn=false())",
+                                                    "Activity": "Activity_mMAu9MfBI",
+                                                    "Expression::Node": [
+                                                        "Node_AmO7MiVfoB"
+                                                    ]
+                                                }
+                                            ],
+                                            "ActivityDefaultSLA::SLA": []
+                                        },
+                                        {
+                                            "Id": "Activity_YY0j865vN",
+                                            "Kind": "Activity",
+                                            "NodeType": "UserTask",
+                                            "ProcessDef": "ProcessDef_hgq5mp06fE",
+                                            "Name": "Test",
+                                            "Activity::Resource": [
+                                                {
+                                                    "Id": "Resource_1_vBt5bYV",
+                                                    "Kind": "Resource",
+                                                    "ValueType": "Field",
+                                                    "DisplayValue": "Created by",
+                                                    "Field": "_created_by",
+                                                    "Activity": "Activity_YY0j865vN"
+                                                }
+                                            ],
+                                            "Activity::Permission": [
+                                                "Permission_b_p8yr9vh",
+                                                "Permission_33-QoPavr",
+                                                "Permission_d8qzWrH2P",
+                                                "Permission_U_VIJMfJs"
+                                            ],
+                                            "Activity::Expression": [
+                                                {
+                                                    "Id": "Expression_g6DBflqEM",
+                                                    "Kind": "Expression",
+                                                    "ExpressionStr": "Select_Option_Draft=\"a\"",
+                                                    "Activity": "Activity_YY0j865vN",
+                                                    "Expression::Node": [
+                                                        "Node_HwoH3e8Xed"
+                                                    ]
+                                                }
+                                            ],
+                                            "ActivityDefaultSLA::SLA": []
+                                        }
+                                    ],
+                                    "ProcessDef::Expression": [
+                                        {
+                                            "Id": "Expression_3GFMPMCEn",
+                                            "Kind": "Expression",
+                                            "ExpressionStr": "Approving=\"Approve\"",
+                                            "ProcessDef": "ProcessDef_hgq5mp06fE",
+                                            "Expression::Node": [
+                                                "Node_CTJIRQpr9-"
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Id": "ProcessDef_7Wvld1QD7l",
+                                    "Kind": "ProcessDef",
+                                    "Name": "Draft Reject",
+                                    "Activity": "Activity_5lS6n0i2W",
+                                    "ProcessDef::Activity": [
+                                        {
+                                            "Id": "Activity_B_kgMv7cS",
+                                            "Kind": "Activity",
+                                            "NodeType": "UserTask",
+                                            "ProcessDef": "ProcessDef_7Wvld1QD7l",
+                                            "Name": "Rejected",
+                                            "Activity::Resource": [
+                                                {
+                                                    "Id": "Resource_uVVh-F1fL",
+                                                    "Kind": "Resource",
+                                                    "ValueType": "Expression",
+                                                    "Activity": "Activity_B_kgMv7cS",
+                                                    "Resource::Expression": [
+                                                        "Expression_lwnDBE8C3"
+                                                    ],
+                                                    "DisplayValue": "userandgroup(Contract_Creator_Group)"
+                                                },
+                                                {
+                                                    "Id": "Resource_pEHOOBexR",
+                                                    "Kind": "Resource",
+                                                    "ValueType": "Field",
+                                                    "DisplayValue": "Creator Group",
+                                                    "Field": "Creator_Group",
+                                                    "Activity": "Activity_B_kgMv7cS"
+                                                }
+                                            ],
+                                            "Activity::Permission": [
+                                                "Permission_1lb1Al7gf",
+                                                "Permission_aDiq9P89g",
+                                                "Permission_cHR04WsFI",
+                                                "Permission__3VAUOyU7",
+                                                "Permission_AUcLXe8Pg",
+                                                "Permission_1y0II5MHc",
+                                                "Permission_Mna7nOUoo",
+                                                "Permission_CW5gzb3BP",
+                                                "Permission_lZ_qJ6xBz",
+                                                "Permission_YM4DmYfJ9",
+                                                "Permission_lfhxG7hKf",
+                                                "Permission_0oAF4gG1E",
+                                                "Permission_H3z3sxlOm",
+                                                "Permission_DzuDuHOkz",
+                                                "Permission_wXbrSUI1I",
+                                                "Permission_tf0OdaeV7",
+                                                "Permission_jYVRRp31F",
+                                                "Permission_YJGzql570",
+                                                "Permission_PpThUDhzz",
+                                                "Permission_ChXhLxwaK",
+                                                "Permission_mKtIstsKR"
+                                            ],
+                                            "Activity::Expression": [
+                                                {
+                                                    "Id": "Expression_cBDA0O9o-",
+                                                    "Kind": "Expression",
+                                                    "ExpressionStr": "AND(Approving=\"Reject\",Cancel_Contract_btn=false())",
+                                                    "Activity": "Activity_B_kgMv7cS",
+                                                    "Expression::Node": [
+                                                        "Node_h89CJyxN9t"
+                                                    ]
+                                                }
+                                            ],
+                                            "ActivityDefaultSLA::SLA": []
+                                        },
+                                        {
+                                            "Id": "Activity_OxpmCnqQZ",
+                                            "Kind": "Activity",
+                                            "NodeType": "GotoTask",
+                                            "ProcessDef": "ProcessDef_7Wvld1QD7l",
+                                            "Goto": "Activity_YFc1KnGAQ|Submit For Review",
+                                            "Name": "Goto-Submit For Review",
+                                            "Activity::Expression": [
+                                                {
+                                                    "Id": "Expression_bVVFqpL1o",
+                                                    "Kind": "Expression",
+                                                    "ExpressionStr": "Select_Option_Draft=\"Submit For Review\"",
+                                                    "Activity": "Activity_OxpmCnqQZ",
+                                                    "Expression::Node": [
+                                                        "Node_PF9i7xmeCR"
+                                                    ]
+                                                }
+                                            ],
+                                            "ActivityDefaultSLA::SLA": [],
+                                            "Activity::Resource": []
+                                        }
+                                    ],
+                                    "ProcessDef::Expression": [
+                                        {
+                                            "Id": "Expression_b453TrFlb",
+                                            "Kind": "Expression",
+                                            "ExpressionStr": "AND(Approving=\"Reject\",Cancel_Contract_btn=false())",
+                                            "ProcessDef": "ProcessDef_7Wvld1QD7l",
+                                            "Expression::Node": [
+                                                "Node_7L7YdDZ4SF"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": [],
+                            "Activity::Resource": []
+                        }
+                    ],
+                    "ProcessDef::Expression": [
+                        {
+                            "Id": "Expression_OpE14m_Gb",
+                            "Kind": "Expression",
+                            "ExpressionStr": "AND(Select_Option_Draft=\"Submit For Review\",Cancel_Contract_btn=false())",
+                            "ProcessDef": "ProcessDef_J_bEKkS6sJ",
+                            "Expression::Node": [
+                                "Node_0AystTXKzV"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "Id": "ProcessDef_-YISgt-_JF",
+                    "Kind": "ProcessDef",
+                    "Name": "Draft",
+                    "Activity": "Activity_J-45vu7Wq",
+                    "ProcessDef::Activity": [
+                        {
+                            "Id": "Activity_ArOPHyxTx",
+                            "Kind": "Activity",
+                            "NodeType": "UserTask",
+                            "ProcessDef": "ProcessDef_-YISgt-_JF",
+                            "Name": "Submit Without Review",
+                            "Activity::Resource": [
+                                {
+                                    "Id": "Resource_xaGZLW17w",
+                                    "Kind": "Resource",
+                                    "ValueType": "Expression",
+                                    "Activity": "Activity_ArOPHyxTx",
+                                    "Resource::Expression": [
+                                        "Expression_bzKN679Gn"
+                                    ],
+                                    "DisplayValue": "userandgroup(Contract_Creator_Group)"
+                                },
+                                {
+                                    "Id": "Resource_BVgLVkPt0",
+                                    "Kind": "Resource",
+                                    "ValueType": "Field",
+                                    "DisplayValue": "Creator Group",
+                                    "Field": "Creator_Group",
+                                    "Activity": "Activity_ArOPHyxTx"
+                                }
+                            ],
+                            "Activity::Permission": [
+                                "Permission_B3mMHS65A",
+                                "Permission_hfPD5naTC",
+                                "Permission_ekY_aZYWC",
+                                "Permission_qYtwME3S4",
+                                "Permission_nDQWZWbpV",
+                                "Permission_ClrZ4Y0_S",
+                                "Permission_uvzsvzLbS"
+                            ],
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_3nOldFgMt",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "State=\"a\"",
+                                    "Activity": "Activity_ArOPHyxTx",
+                                    "Expression::Node": [
+                                        "Node_k5JqwAzZ1L"
+                                    ]
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": []
+                        }
+                    ],
+                    "ProcessDef::Expression": [
+                        {
+                            "Id": "Expression_9KPzDCSFd",
+                            "Kind": "Expression",
+                            "ExpressionStr": "AND(Select_Option_Draft=\"Submit Without Review\",Cancel_Contract_btn=false())",
+                            "ProcessDef": "ProcessDef_-YISgt-_JF",
+                            "Expression::Node": [
+                                "Node_MX_TRgA-la"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "Id": "ProcessDef_Co030CJvZ",
+                    "Kind": "ProcessDef",
+                    "Activity": "Activity_J-45vu7Wq",
+                    "Name": "Draft",
+                    "ProcessDef::Activity": [
+                        {
+                            "Id": "Activity_97Aa-N1E3",
+                            "Kind": "Activity",
+                            "NodeType": "UserTask",
+                            "ProcessDef": "ProcessDef_Co030CJvZ",
+                            "Name": "Update",
+                            "Activity::Resource": [
+                                {
+                                    "Id": "Resource_7o-hbuqaQ",
+                                    "Kind": "Resource",
+                                    "ValueType": "Field",
+                                    "DisplayValue": "Created by",
+                                    "Field": "_created_by",
+                                    "Activity": "Activity_97Aa-N1E3"
+                                }
+                            ],
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_KuECuVbB8",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "Cancel_Contract_btn=false()",
+                                    "Activity": "Activity_97Aa-N1E3",
+                                    "Expression::Node": [
+                                        "Node_3pS45OFrXm"
+                                    ]
+                                }
+                            ],
+                            "Activity::Permission": [
+                                "Permission_PtvLK1xQQ",
+                                "Permission__VrnU-T50",
+                                "Permission_-JNGTrf0l",
+                                "Permission_G1Vsq8KMT"
+                            ],
+                            "ActivityDefaultSLA::SLA": []
+                        },
+                        {
+                            "Id": "Activity_9yvY7zki-",
+                            "Kind": "Activity",
+                            "NodeType": "GotoTask",
+                            "ProcessDef": "ProcessDef_Co030CJvZ",
+                            "Goto": "Activity_a69WuG-f1|Draft",
+                            "Name": "Goto-Draft",
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_LS8nuU84t",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "Select_Option_Draft=\"Update\"",
+                                    "Activity": "Activity_9yvY7zki-",
+                                    "Expression::Node": [
+                                        "Node_6k2NxtXxDH"
+                                    ]
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": [],
+                            "Activity::Resource": []
+                        }
+                    ],
+                    "ProcessDef::Expression": [
+                        {
+                            "Id": "Expression_pwSF9S_Ai",
+                            "Kind": "Expression",
+                            "ExpressionStr": "AND(Select_Option_Draft=\"Update\",Cancel_Contract_btn=false())",
+                            "ProcessDef": "ProcessDef_Co030CJvZ",
+                            "Expression::Node": [
+                                "Node_RL3y-dOkq5"
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "ActivityDefaultSLA::SLA": [],
+            "Activity::Resource": []
+        },
+        {
+            "Id": "Activity__EeS7zrpr",
+            "Kind": "Activity",
+            "NodeType": "UserTask",
+            "ProcessDef": "ProcessDef_SaXT0wX3Zo",
+            "Name": "Draft Approved",
+            "Activity::Resource": [
+                {
+                    "Id": "Resource_-aq5XU0lx",
+                    "Kind": "Resource",
+                    "ValueType": "User",
+                    "DisplayValue": "Yin Thu Thu Htet",
+                    "Value": "Us5LinJsGol4",
+                    "Activity": "Activity__EeS7zrpr"
+                },
+                {
+                    "Id": "Resource_mX-r3eSpQ",
+                    "Kind": "Resource",
+                    "ValueType": "User",
+                    "DisplayValue": "Workflow IT",
+                    "Value": "Us5LinIVDM5z",
+                    "Activity": "Activity__EeS7zrpr"
+                }
+            ],
+            "Activity::Permission": [
+                "Permission_0Cgt9lL9k",
+                "Permission_kjs7B7hnSC",
+                "Permission_OwE3CNdyR",
+                "Permission_41bLiVldR",
+                "Permission_rtg7sJYR0",
+                "Permission_wfJUvJJQB",
+                "Permission_wptfmUrYY",
+                "Permission_4UGefyAo7",
+                "Permission_OyCSt3TLM",
+                "Permission_ssQupOV70",
+                "Permission_pwetJifxO",
+                "Permission_iwrf23knk",
+                "Permission_oopsckq2z"
+            ],
+            "Activity::Expression": [
+                {
+                    "Id": "Expression_ENQ2B91ja",
+                    "Kind": "Expression",
+                    "ExpressionStr": "Cancel_Contract_btn=false() && Starts_Effective_Date>Today_Date && Select_Option_Draft=\"Submit For Review\"",
+                    "Activity": "Activity__EeS7zrpr",
+                    "Expression::Node": [
+                        "Node_3vXoueWuSY"
+                    ]
+                }
+            ],
+            "ActivityDefaultSLA::SLA": []
+        },
+        {
+            "Id": "Activity_Hg39ej_Mv",
+            "Kind": "Activity",
+            "NodeType": "UserTask",
+            "ProcessDef": "ProcessDef_SaXT0wX3Zo",
+            "Name": "Active",
+            "Activity::Resource": [
+                {
+                    "Id": "Resource__kMbII3y-",
+                    "Kind": "Resource",
+                    "ValueType": "Expression",
+                    "Activity": "Activity_Hg39ej_Mv",
+                    "Resource::Expression": [
+                        "Expression_4ZQDoYizD"
+                    ],
+                    "DisplayValue": "userandgroup(Contract_Creator_Group)"
+                },
+                {
+                    "Id": "Resource_ZmSbY1qgi",
+                    "Kind": "Resource",
+                    "ValueType": "Field",
+                    "DisplayValue": "Creator Group",
+                    "Field": "Creator_Group",
+                    "Activity": "Activity_Hg39ej_Mv"
+                }
+            ],
+            "Activity::Permission": [
+                "Permission_a2oix1hna",
+                "Permission_sNDkvOtcz",
+                "Permission_20fPpNkmX",
+                "Permission_2HhCzeWkp",
+                "Permission_x3Aw0k2fa",
+                "Permission_PDYl8b-0m",
+                "Permission_-EwEvwNVh",
+                "Permission_LnvMxI5Bp",
+                "Permission_uIN8Zta1Z",
+                "Permission_-8cYup0qi",
+                "Permission_xEl-Od9U5",
+                "Permission_tegJ42vS9",
+                "Permission_R2Uj9cZbX",
+                "Permission_mtUDpyjg-",
+                "Permission_5B8RiIHzo",
+                "Permission_VS6j1-6NP",
+                "Permission_Zr066n42D",
+                "Permission_NYjgF1BWC",
+                "Permission_-2wCHKYge",
+                "Permission_ldT_1HXcr",
+                "Permission_ww3nCEQrA",
+                "Permission_eKvK9LSkk",
+                "Permission_HrCLJd2oQ",
+                "Permission_qrfMF60__"
+            ],
+            "Goto::Activity": [
+                "Activity_mwQzAveyW",
+                "Activity_e2jMysblp"
+            ],
+            "Activity::Expression": [
+                {
+                    "Id": "Expression_t3FZ3qtNk",
+                    "Kind": "Expression",
+                    "ExpressionStr": "Cancel_Contract_btn=false()",
+                    "Activity": "Activity_Hg39ej_Mv",
+                    "Expression::Node": [
+                        "Node_gfyR4DaTWc"
+                    ]
+                }
+            ],
+            "ActivityDefaultSLA::SLA": []
+        },
+        {
+            "Id": "Activity_Hh-1xwaR_",
+            "Kind": "Activity",
+            "NodeType": "UserTask",
+            "ProcessDef": "ProcessDef_SaXT0wX3Zo",
+            "Name": "Active Step",
+            "Activity::Resource": [
+                {
+                    "Id": "Resource_cDa9-Zm8F",
+                    "Kind": "Resource",
+                    "ValueType": "Field",
+                    "DisplayValue": "Created by",
+                    "Field": "_created_by",
+                    "Activity": "Activity_Hh-1xwaR_"
+                }
+            ],
+            "Goto::Activity": [
+                "Activity_z_6O6WYiF",
+                "Activity_mikFOSG8J",
+                "Activity_Cz21G8D2Q",
+                "Activity_-WytZP-jB"
+            ],
+            "Activity::Expression": [
+                {
+                    "Id": "Expression_R22rxX6VF",
+                    "Kind": "Expression",
+                    "ExpressionStr": "Substate=\"a\"",
+                    "Activity": "Activity_Hh-1xwaR_",
+                    "Expression::Node": [
+                        "Node_2SnLzUUQhE"
+                    ]
+                }
+            ],
+            "ActivityDefaultSLA::SLA": []
+        },
+        {
+            "Id": "Activity_dU7Fn3N1J",
+            "Kind": "Activity",
+            "Name": "ParallelActivity5",
+            "NodeType": "Parallel",
+            "ProcessDef": "ProcessDef_SaXT0wX3Zo",
+            "Activity::ProcessDef": [
+                {
+                    "Id": "ProcessDef_IOmQLXNXo_",
+                    "Kind": "ProcessDef",
+                    "Name": "submit for review",
+                    "Activity": "Activity_dU7Fn3N1J",
+                    "ProcessDef::Activity": [
+                        {
+                            "Id": "Activity_j7huzZju4",
+                            "Kind": "Activity",
+                            "NodeType": "UserTask",
+                            "ProcessDef": "ProcessDef_IOmQLXNXo_",
+                            "Name": "Submit for review",
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_mcJ2lEP-I",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "Cancel_Contract_btn=false()",
+                                    "Activity": "Activity_j7huzZju4",
+                                    "Expression::Node": [
+                                        "Node_KJW0nDtC4_"
+                                    ]
+                                }
+                            ],
+                            "Activity::Permission": [
+                                "Permission_h-pi0V30M",
+                                "Permission_XPwew2E4W",
+                                "Permission_bHOFfqInq",
+                                "Permission_D22N5YgFZ",
+                                "Permission_RUko0WTD9",
+                                "Permission_C60owreX6",
+                                "Permission_OBJJvnGcS",
+                                "Permission_3yHrE2_Ui",
+                                "Permission_LpzWv3HLv",
+                                "Permission_mxJABam2T",
+                                "Permission_lAOgbRtZx",
+                                "Permission_PhCfZVne1",
+                                "Permission_DkWXKhNiT",
+                                "Permission_1tkVX7JBB",
+                                "Permission_cimlrBzgO",
+                                "Permission_ZKRR3TfMP"
+                            ],
+                            "Goto::Activity": [
+                                "Activity_j1eFHaxYs"
+                            ],
+                            "Activity::Resource": [
+                                {
+                                    "Id": "Resource_Cz5583p0h",
+                                    "Kind": "Resource",
+                                    "ValueType": "Expression",
+                                    "Activity": "Activity_j7huzZju4",
+                                    "Resource::Expression": [
+                                        "Expression_oaWptNY_A"
+                                    ],
+                                    "DisplayValue": "userandgroup(Login_Approver_Group)"
+                                },
+                                {
+                                    "Id": "Resource_ZnpUUqSjo",
+                                    "Kind": "Resource",
+                                    "ValueType": "Field",
+                                    "DisplayValue": "Approver Group",
+                                    "Field": "Approver_Group",
+                                    "Activity": "Activity_j7huzZju4"
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": []
+                        },
+                        {
+                            "Id": "Activity__9qcAqwl6",
+                            "Kind": "Activity",
+                            "Name": "ParallelActivity0",
+                            "NodeType": "Parallel",
+                            "ProcessDef": "ProcessDef_IOmQLXNXo_",
+                            "Activity::ProcessDef": [
+                                {
+                                    "Id": "ProcessDef_S3Yui8DslB",
+                                    "Kind": "ProcessDef",
+                                    "Name": "Approved",
+                                    "Activity": "Activity__9qcAqwl6",
+                                    "ProcessDef::Expression": [
+                                        {
+                                            "Id": "Expression_i8UCpmeCA",
+                                            "Kind": "Expression",
+                                            "ExpressionStr": "AND(Approving=\"Approve\",Cancel_Contract_btn=false())",
+                                            "ProcessDef": "ProcessDef_S3Yui8DslB",
+                                            "Expression::Node": [
+                                                "Node_NW_CX1wKUg"
+                                            ]
+                                        }
+                                    ],
+                                    "ProcessDef::Activity": []
+                                },
+                                {
+                                    "Id": "ProcessDef_gUWDmNEw_M",
+                                    "Kind": "ProcessDef",
+                                    "Name": "Reject",
+                                    "Activity": "Activity__9qcAqwl6",
+                                    "ProcessDef::Activity": [
+                                        {
+                                            "Id": "Activity_bDGfl_q-h",
+                                            "Kind": "Activity",
+                                            "NodeType": "UserTask",
+                                            "ProcessDef": "ProcessDef_gUWDmNEw_M",
+                                            "Name": "Reject",
+                                            "Activity::Resource": [
+                                                {
+                                                    "Id": "Resource_R9kDQR8uM",
+                                                    "Kind": "Resource",
+                                                    "ValueType": "Expression",
+                                                    "Activity": "Activity_bDGfl_q-h",
+                                                    "Resource::Expression": [
+                                                        "Expression_V--RL8_md"
+                                                    ],
+                                                    "DisplayValue": "userandgroup(Contract_Creator_Group)"
+                                                },
+                                                {
+                                                    "Id": "Resource_sBR1xFArh",
+                                                    "Kind": "Resource",
+                                                    "ValueType": "Field",
+                                                    "DisplayValue": "Creator Group",
+                                                    "Field": "Creator_Group",
+                                                    "Activity": "Activity_bDGfl_q-h"
+                                                }
+                                            ],
+                                            "Activity::Expression": [
+                                                {
+                                                    "Id": "Expression_oTl0z18cW",
+                                                    "Kind": "Expression",
+                                                    "ExpressionStr": "AND(Approving=\"Reject\",Cancel_Contract_btn=false())",
+                                                    "Activity": "Activity_bDGfl_q-h",
+                                                    "Expression::Node": [
+                                                        "Node_9YjHCshyUe"
+                                                    ]
+                                                }
+                                            ],
+                                            "Activity::Permission": [
+                                                "Permission_styOhwIen",
+                                                "Permission_izCVofY6i",
+                                                "Permission_OIpfwY1cs",
+                                                "Permission_UZ8CLKnNl",
+                                                "Permission_hQsJD4BH8",
+                                                "Permission_MCMvetHsN",
+                                                "Permission__KQdh8U6h",
+                                                "Permission_MW7i1UCw-",
+                                                "Permission_jaF57OJ8w",
+                                                "Permission_psKMoSWEn",
+                                                "Permission_2LXYPyd9z",
+                                                "Permission_9QdrIU_rP"
+                                            ],
+                                            "ActivityDefaultSLA::SLA": []
+                                        },
+                                        {
+                                            "Id": "Activity_j1eFHaxYs",
+                                            "Kind": "Activity",
+                                            "NodeType": "GotoTask",
+                                            "ProcessDef": "ProcessDef_gUWDmNEw_M",
+                                            "Goto": "Activity_j7huzZju4|Submit for review",
+                                            "Name": "Goto-Submit for review",
+                                            "Activity::Expression": [
+                                                {
+                                                    "Id": "Expression_m9WujV9sF",
+                                                    "Kind": "Expression",
+                                                    "ExpressionStr": "Select_Option_Draft=\"Submit For Review\"",
+                                                    "Activity": "Activity_j1eFHaxYs",
+                                                    "Expression::Node": [
+                                                        "Node_wgOwZLNcc-"
+                                                    ]
+                                                }
+                                            ],
+                                            "ActivityDefaultSLA::SLA": [],
+                                            "Activity::Resource": []
+                                        }
+                                    ],
+                                    "ProcessDef::Expression": [
+                                        {
+                                            "Id": "Expression_liTzgae0X",
+                                            "Kind": "Expression",
+                                            "ExpressionStr": "AND(Approving=\"Reject\",Cancel_Contract_btn=false())",
+                                            "ProcessDef": "ProcessDef_gUWDmNEw_M",
+                                            "Expression::Node": [
+                                                "Node_MyoTcMEimA"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": [],
+                            "Activity::Resource": []
+                        }
+                    ],
+                    "ProcessDef::Expression": [
+                        {
+                            "Id": "Expression_itImJp1vL",
+                            "Kind": "Expression",
+                            "ExpressionStr": "AND(Select_Option_Draft=\"Submit For Review\",Cancel_Contract_btn=false())",
+                            "ProcessDef": "ProcessDef_IOmQLXNXo_",
+                            "Expression::Node": [
+                                "Node_yrZ6R4qelL"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "Id": "ProcessDef_5dkjuEFkPp",
+                    "Kind": "ProcessDef",
+                    "Name": "submit without review",
+                    "Activity": "Activity_dU7Fn3N1J",
+                    "ProcessDef::Expression": [
+                        {
+                            "Id": "Expression_TQL9eZV31",
+                            "Kind": "Expression",
+                            "ExpressionStr": "AND(Select_Option_Draft=\"Submit Without Review\",Cancel_Contract_btn=false())",
+                            "ProcessDef": "ProcessDef_5dkjuEFkPp",
+                            "Expression::Node": [
+                                "Node__XdYWdzkFn"
+                            ]
+                        }
+                    ],
+                    "ProcessDef::Activity": []
+                }
+            ],
+            "ActivityDefaultSLA::SLA": [],
+            "Activity::Resource": []
+        },
+        {
+            "Id": "Activity_DudeCsQDR",
+            "Kind": "Activity",
+            "NodeType": "UserTask",
+            "ProcessDef": "ProcessDef_SaXT0wX3Zo",
+            "Name": "Temp",
+            "Activity::Resource": [
+                {
+                    "Id": "Resource_6JY3dhvG4",
+                    "Kind": "Resource",
+                    "ValueType": "Field",
+                    "DisplayValue": "Created by",
+                    "Field": "_created_by",
+                    "Activity": "Activity_DudeCsQDR"
+                }
+            ],
+            "Activity::Expression": [
+                {
+                    "Id": "Expression_Bb2GCaef5",
+                    "Kind": "Expression",
+                    "ExpressionStr": "Contract_Number=\"0\"",
+                    "Activity": "Activity_DudeCsQDR",
+                    "Expression::Node": [
+                        "Node_Ga3NJDtLlV"
+                    ]
+                }
+            ],
+            "ActivityDefaultSLA::SLA": []
+        },
+        {
+            "Id": "Activity_VK8ceZ66y",
+            "Kind": "Activity",
+            "Name": "ParallelActivity7",
+            "NodeType": "Parallel",
+            "ProcessDef": "ProcessDef_SaXT0wX3Zo",
+            "Activity::ProcessDef": [
+                {
+                    "Id": "ProcessDef_78al_tXInC",
+                    "Kind": "ProcessDef",
+                    "Name": "Contract Update",
+                    "Activity": "Activity_VK8ceZ66y",
+                    "ProcessDef::Activity": [
+                        {
+                            "Id": "Activity_2VU_JxG0O",
+                            "Kind": "Activity",
+                            "NodeType": "UserTask",
+                            "ProcessDef": "ProcessDef_78al_tXInC",
+                            "Name": "Update",
+                            "Activity::Resource": [
+                                {
+                                    "Id": "Resource_6ov4geiB8",
+                                    "Kind": "Resource",
+                                    "ValueType": "Field",
+                                    "DisplayValue": "Created by",
+                                    "Field": "_created_by",
+                                    "Activity": "Activity_2VU_JxG0O"
+                                }
+                            ],
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_bLR5wdOOJ",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "Cancel_Contract_btn=false()",
+                                    "Activity": "Activity_2VU_JxG0O",
+                                    "Expression::Node": [
+                                        "Node_utdIFHrIXd"
+                                    ]
+                                }
+                            ],
+                            "Activity::Permission": [
+                                "Permission_Dt-WcuG42"
+                            ],
+                            "ActivityDefaultSLA::SLA": []
+                        },
+                        {
+                            "Id": "Activity_mZZhxqNl8",
+                            "Kind": "Activity",
+                            "NodeType": "GotoTask",
+                            "ProcessDef": "ProcessDef_78al_tXInC",
+                            "Goto": "Activity_a69WuG-f1|Draft",
+                            "Name": "Goto-Draft",
+                            "ActivityDefaultSLA::SLA": [],
+                            "Activity::Resource": [],
+                            "Activity::Expression": []
+                        }
+                    ],
+                    "ProcessDef::Expression": [
+                        {
+                            "Id": "Expression_z9DJ5W0Pv",
+                            "Kind": "Expression",
+                            "ExpressionStr": "Cancel_Contract_btn=false() && Select_Option_Draft=\"tt\"",
+                            "ProcessDef": "ProcessDef_78al_tXInC",
+                            "Expression::Node": [
+                                "Node_sWx1Bhu9wp"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "Id": "ProcessDef_cyZ5dwJj9l",
+                    "Kind": "ProcessDef",
+                    "Name": "Contract Adjust",
+                    "Activity": "Activity_VK8ceZ66y",
+                    "ProcessDef::Activity": [
+                        {
+                            "Id": "Activity_mD8RJIfYs",
+                            "Kind": "Activity",
+                            "NodeType": "UserTask",
+                            "ProcessDef": "ProcessDef_cyZ5dwJj9l",
+                            "Name": "Adjust",
+                            "Activity::Resource": [
+                                {
+                                    "Id": "Resource_Td1t8nBiB",
+                                    "Kind": "Resource",
+                                    "ValueType": "Field",
+                                    "DisplayValue": "Created by",
+                                    "Field": "_created_by",
+                                    "Activity": "Activity_mD8RJIfYs"
+                                }
+                            ],
+                            "Activity::Permission": [
+                                "Permission_aHd_7PCZf",
+                                "Permission_Lncl6b5cg",
+                                "Permission_pL-Ekv4eO",
+                                "Permission_PXnbV1EJN",
+                                "Permission_sO86Fu0_b",
+                                "Permission_EQYtt8nGv",
+                                "Permission_oMzTMaZJf"
+                            ],
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_b5lRv4uX6",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "Cancel_Contract_btn=false()",
+                                    "Activity": "Activity_mD8RJIfYs",
+                                    "Expression::Node": [
+                                        "Node_k4kZ_KOHPm"
+                                    ]
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": []
+                        },
+                        {
+                            "Id": "Activity_mwQzAveyW",
+                            "Kind": "Activity",
+                            "NodeType": "GotoTask",
+                            "ProcessDef": "ProcessDef_cyZ5dwJj9l",
+                            "Goto": "Activity_Hg39ej_Mv|Active",
+                            "Name": "Goto-Active",
+                            "ActivityDefaultSLA::SLA": [],
+                            "Activity::Resource": [],
+                            "Activity::Expression": []
+                        }
+                    ],
+                    "ProcessDef::Expression": [
+                        {
+                            "Id": "Expression_A3dJGFg9S",
+                            "Kind": "Expression",
+                            "ExpressionStr": "Cancel_Contract_btn=false() && Select_Option_Draft=\"tt\"",
+                            "ProcessDef": "ProcessDef_cyZ5dwJj9l",
+                            "Expression::Node": [
+                                "Node_K36-qOHDus"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "Id": "ProcessDef_U-9_TK4PU",
+                    "Kind": "ProcessDef",
+                    "Activity": "Activity_VK8ceZ66y",
+                    "Name": "Contract Cancel",
+                    "ProcessDef::Activity": [
+                        {
+                            "Id": "Activity_hkkBkKNbW",
+                            "Kind": "Activity",
+                            "NodeType": "UserTask",
+                            "ProcessDef": "ProcessDef_U-9_TK4PU",
+                            "Name": "Contract Cancel",
+                            "Activity::Resource": [
+                                {
+                                    "Id": "Resource_LTTOaq4L9",
+                                    "Kind": "Resource",
+                                    "ValueType": "Field",
+                                    "DisplayValue": "Created by",
+                                    "Field": "_created_by",
+                                    "Activity": "Activity_hkkBkKNbW"
+                                }
+                            ],
+                            "Activity::Permission": [
+                                "Permission_s0PtQhwXG",
+                                "Permission_0s6OeKX-l",
+                                "Permission_Mb2JIBEDX",
+                                "Permission_eSKqR4rIK",
+                                "Permission_jF8UARBxP",
+                                "Permission_yNmOFngME",
+                                "Permission_yE7Vd_LWA",
+                                "Permission_XTcHAaXvo"
+                            ],
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_7kugWwKFe",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "Cancel_Contract_btn=true() && Contract_Number=\"aaa\"\r\n",
+                                    "Activity": "Activity_hkkBkKNbW",
+                                    "Expression::Node": [
+                                        "Node_IWe59P_d4X"
+                                    ]
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": []
+                        }
+                    ],
+                    "ProcessDef::Expression": [
+                        {
+                            "Id": "Expression_mN9HH6Wzu",
+                            "Kind": "Expression",
+                            "ExpressionStr": "Cancel_Contract_btn=true() || Extend_btn=false() || Renew_btn=false()",
+                            "ProcessDef": "ProcessDef_U-9_TK4PU",
+                            "Expression::Node": [
+                                "Node_r-9WJR6NDb"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "Id": "ProcessDef_ZgVYpZbcW",
+                    "Kind": "ProcessDef",
+                    "Activity": "Activity_VK8ceZ66y",
+                    "Name": "Contract Extend",
+                    "ProcessDef::Activity": [
+                        {
+                            "Id": "Activity_5zr_Jtv1j",
+                            "Kind": "Activity",
+                            "NodeType": "UserTask",
+                            "ProcessDef": "ProcessDef_ZgVYpZbcW",
+                            "Name": "Extend",
+                            "Activity::Resource": [
+                                {
+                                    "Id": "Resource_FRlE4UqCJ",
+                                    "Kind": "Resource",
+                                    "ValueType": "Expression",
+                                    "Activity": "Activity_5zr_Jtv1j",
+                                    "Resource::Expression": [
+                                        "Expression_SucD9F_Sj"
+                                    ],
+                                    "DisplayValue": "userandgroup(Contract_Creator_Group)"
+                                },
+                                {
+                                    "Id": "Resource_yIPlxYRZS",
+                                    "Kind": "Resource",
+                                    "ValueType": "Field",
+                                    "DisplayValue": "Creator Group",
+                                    "Field": "Creator_Group",
+                                    "Activity": "Activity_5zr_Jtv1j"
+                                }
+                            ],
+                            "Activity::Permission": [
+                                "Permission_-JvnKvrzw",
+                                "Permission_NXn1tLxdA",
+                                "Permission_gr2D6RZRf",
+                                "Permission_p0h673HSa",
+                                "Permission_E17navKMC-",
+                                "Permission_CSxm--DAT",
+                                "Permission_t20ig5k1u",
+                                "Permission_CPog7DLVe",
+                                "Permission_7aUt2u_gJ",
+                                "Permission_rmRBowlc2",
+                                "Permission_iZLu_Eje7",
+                                "Permission_GOydT9vY5",
+                                "Permission_KmKHxVwkK",
+                                "Permission_80JuPOKqF"
+                            ],
+                            "Goto::Activity": [
+                                "Activity_mrFBBwcfY",
+                                "Activity_KQV6xRqIx",
+                                "Activity_pDg7GGJOu"
+                            ],
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_Sp4X7CbAq",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "AND((State=\"Active\"|| State=\"Expired\" ||State=\"Extend\" ||State=\"Renew\" || State=\"Extend Rejected\"),(Substate=\"Extend\"||Substate=\"Rejected\"||Substate=\"Approved\"||Substate=\"Extend Approved\"|| Substate=\"Extend Rejected\" || Substate=\"Under Review\" || Substate=\"None\" ||Substate=\"Renew Approved\")) && Ends_Expiration_Date.totext(\"yyyy-mm-dd\")!=\"\" &&Cancel_Contract_btn=false())",
+                                    "Activity": "Activity_5zr_Jtv1j",
+                                    "Expression::Node": [
+                                        "Node_oSSlfZhbVN"
+                                    ]
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": []
+                        },
+                        {
+                            "Id": "Activity_pDg7GGJOu",
+                            "Kind": "Activity",
+                            "NodeType": "GotoTask",
+                            "ProcessDef": "ProcessDef_ZgVYpZbcW",
+                            "Goto": "Activity_5zr_Jtv1j|Extend",
+                            "Name": "Goto-Extend",
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_KdO88GP6E",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "State=\"Expired\" && Substate=\"None\" && Select_Option_Draft=\"Submit Without Review\"\r\n",
+                                    "Activity": "Activity_pDg7GGJOu",
+                                    "Expression::Node": [
+                                        "Node_6Cd8qp643n"
+                                    ]
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": [],
+                            "Activity::Resource": []
+                        },
+                        {
+                            "Id": "Activity_Cz21G8D2Q",
+                            "Kind": "Activity",
+                            "NodeType": "GotoTask",
+                            "ProcessDef": "ProcessDef_ZgVYpZbcW",
+                            "Goto": "Activity_Hh-1xwaR_|Active Step",
+                            "Name": "Goto-Active Step",
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_iXCBIC6QF",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "Select_Option_Draft=\"Submit For Review\" && State=\"Expired\" && Substate=\"None\"",
+                                    "Activity": "Activity_Cz21G8D2Q",
+                                    "Expression::Node": [
+                                        "Node_oT9E8TaTKP"
+                                    ]
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": [],
+                            "Activity::Resource": []
+                        },
+                        {
+                            "Id": "Activity_z_6O6WYiF",
+                            "Kind": "Activity",
+                            "NodeType": "GotoTask",
+                            "ProcessDef": "ProcessDef_ZgVYpZbcW",
+                            "Goto": "Activity_Hh-1xwaR_|Active Step",
+                            "Name": "Goto-Active Step",
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_icJTikPRv",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "\r\n(State=\"Active\" || State=\"Expired\" || State=\"Extend\" || State=\"Extend Rejected\") && (Substate=\"Extend\"||Substate=\"Rejected\"||Substate=\"Approved\"||Substate=\"Extend Approved\"||Substate=\"Extend Rejected\" || Substate=\"Under Review\") ",
+                                    "Activity": "Activity_z_6O6WYiF",
+                                    "Expression::Node": [
+                                        "Node_wTpbew56NE"
+                                    ]
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": [],
+                            "Activity::Resource": []
+                        },
+                        {
+                            "Id": "Activity_c7Ws8eAJL",
+                            "Kind": "Activity",
+                            "Name": "ParallelActivity2",
+                            "NodeType": "Parallel",
+                            "ProcessDef": "ProcessDef_ZgVYpZbcW",
+                            "Activity::ProcessDef": [
+                                {
+                                    "Id": "ProcessDef_2izxGiT_R5",
+                                    "Kind": "ProcessDef",
+                                    "Name": "Active Approve",
+                                    "Activity": "Activity_c7Ws8eAJL",
+                                    "ProcessDef::Activity": [
+                                        {
+                                            "Id": "Activity_3rmAQq4yq",
+                                            "Kind": "Activity",
+                                            "NodeType": "UserTask",
+                                            "ProcessDef": "ProcessDef_2izxGiT_R5",
+                                            "Name": "Approve",
+                                            "Activity::Resource": [
+                                                {
+                                                    "Id": "Resource_chpke3EjM",
+                                                    "Kind": "Resource",
+                                                    "ValueType": "Expression",
+                                                    "Activity": "Activity_3rmAQq4yq",
+                                                    "Resource::Expression": [
+                                                        "Expression_aJIlTN9yR"
+                                                    ],
+                                                    "DisplayValue": "userandgroup(Contract_Creator_Group)"
+                                                },
+                                                {
+                                                    "Id": "Resource_rM06Bza93",
+                                                    "Kind": "Resource",
+                                                    "ValueType": "Field",
+                                                    "DisplayValue": "Creator Group",
+                                                    "Field": "Creator_Group",
+                                                    "Activity": "Activity_3rmAQq4yq"
+                                                }
+                                            ],
+                                            "Activity::Permission": [
+                                                "Permission_k-Oi5-nFT",
+                                                "Permission_vNCTGApVY",
+                                                "Permission_A9CGrLIGq",
+                                                "Permission_O9rtseVBZ",
+                                                "Permission_xuBMibk__",
+                                                "Permission_LRUsoIiey",
+                                                "Permission_QAA-TtV-Q",
+                                                "Permission_V9dlnJuDH",
+                                                "Permission_bRc3g4_kZ",
+                                                "Permission_Q4sBEA1PS",
+                                                "Permission_LioJZDNXK",
+                                                "Permission_77NwzL7fX"
+                                            ],
+                                            "Activity::Expression": [
+                                                {
+                                                    "Id": "Expression_43CdK4Hp6",
+                                                    "Kind": "Expression",
+                                                    "ExpressionStr": "Approving=\"Approve\"&& State=\"Active\" && Approver_State=\"Requested\"&& Cancel_Contract_btn=false()",
+                                                    "Activity": "Activity_3rmAQq4yq",
+                                                    "Expression::Node": [
+                                                        "Node_z6pCaQCgu-"
+                                                    ]
+                                                }
+                                            ],
+                                            "ActivityDefaultSLA::SLA": []
+                                        },
+                                        {
+                                            "Id": "Activity_mrFBBwcfY",
+                                            "Kind": "Activity",
+                                            "NodeType": "GotoTask",
+                                            "ProcessDef": "ProcessDef_2izxGiT_R5",
+                                            "Goto": "Activity_5zr_Jtv1j|Extend",
+                                            "Name": "Goto-Extend",
+                                            "Activity::Expression": [
+                                                {
+                                                    "Id": "Expression_VOFJzjlEK",
+                                                    "Kind": "Expression",
+                                                    "ExpressionStr": "Substate=\"Extend Approved\" && Extend_btn=true()",
+                                                    "Activity": "Activity_mrFBBwcfY",
+                                                    "Expression::Node": [
+                                                        "Node_e2pRzXPE0w"
+                                                    ]
+                                                }
+                                            ],
+                                            "ActivityDefaultSLA::SLA": [],
+                                            "Activity::Resource": []
+                                        }
+                                    ],
+                                    "ProcessDef::Expression": [
+                                        {
+                                            "Id": "Expression_K5xRDMdMi",
+                                            "Kind": "Expression",
+                                            "ExpressionStr": "Select_Option_Draft=\"ss\"",
+                                            "ProcessDef": "ProcessDef_2izxGiT_R5",
+                                            "Expression::Node": [
+                                                "Node_oltJMSpNdO"
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Id": "ProcessDef_YdQRWQ3blh",
+                                    "Kind": "ProcessDef",
+                                    "Name": "Active Reject",
+                                    "Activity": "Activity_c7Ws8eAJL",
+                                    "ProcessDef::Activity": [
+                                        {
+                                            "Id": "Activity_hBa0SbSa7",
+                                            "Kind": "Activity",
+                                            "NodeType": "UserTask",
+                                            "ProcessDef": "ProcessDef_YdQRWQ3blh",
+                                            "Name": "Extend Reject",
+                                            "Activity::Resource": [
+                                                {
+                                                    "Id": "Resource_B-ChlJJNK",
+                                                    "Kind": "Resource",
+                                                    "ValueType": "Expression",
+                                                    "Activity": "Activity_hBa0SbSa7",
+                                                    "Resource::Expression": [
+                                                        "Expression_K45sf--C0"
+                                                    ],
+                                                    "DisplayValue": "userandgroup(Contract_Creator_Group)"
+                                                },
+                                                {
+                                                    "Id": "Resource_ctP92n_cd",
+                                                    "Kind": "Resource",
+                                                    "ValueType": "Field",
+                                                    "DisplayValue": "Creator Group",
+                                                    "Field": "Creator_Group",
+                                                    "Activity": "Activity_hBa0SbSa7"
+                                                }
+                                            ],
+                                            "Activity::Permission": [
+                                                "Permission_xrE5z6vne",
+                                                "Permission_aFAevnaZSP",
+                                                "Permission_VQrRF8ZD7",
+                                                "Permission_FauzH8Ilt",
+                                                "Permission_g7u1QjiEp",
+                                                "Permission_hZg0x8zlw",
+                                                "Permission_TneLYAmen",
+                                                "Permission_bpMx8uFkF",
+                                                "Permission_xyfMfM1wn",
+                                                "Permission_p1jFIuSLG",
+                                                "Permission_xhXSO47pd",
+                                                "Permission_dyL8hte7W",
+                                                "Permission_U7czv4rlG"
+                                            ],
+                                            "Activity::Expression": [
+                                                {
+                                                    "Id": "Expression_HrJPfH4AM",
+                                                    "Kind": "Expression",
+                                                    "ExpressionStr": "Approving=\"Reject\" && State=\"Active\"&& Cancel_Contract_btn=false()",
+                                                    "Activity": "Activity_hBa0SbSa7",
+                                                    "Expression::Node": [
+                                                        "Node_d5awbGvti4"
+                                                    ]
+                                                }
+                                            ],
+                                            "ActivityDefaultSLA::SLA": []
+                                        },
+                                        {
+                                            "Id": "Activity_KQV6xRqIx",
+                                            "Kind": "Activity",
+                                            "NodeType": "GotoTask",
+                                            "ProcessDef": "ProcessDef_YdQRWQ3blh",
+                                            "Goto": "Activity_5zr_Jtv1j|Extend",
+                                            "Name": "Goto-Extend",
+                                            "Activity::Expression": [
+                                                {
+                                                    "Id": "Expression_cV8r38GBg",
+                                                    "Kind": "Expression",
+                                                    "ExpressionStr": "AND(Approving=\"Reject\",State=\"Active\")",
+                                                    "Activity": "Activity_KQV6xRqIx",
+                                                    "Expression::Node": [
+                                                        "Node_AhR0cUPEaY"
+                                                    ]
+                                                }
+                                            ],
+                                            "ActivityDefaultSLA::SLA": [],
+                                            "Activity::Resource": []
+                                        }
+                                    ],
+                                    "ProcessDef::Expression": [
+                                        {
+                                            "Id": "Expression_jHUAyfXlg",
+                                            "Kind": "Expression",
+                                            "ExpressionStr": "Select_Option_Draft=\"ss\"",
+                                            "ProcessDef": "ProcessDef_YdQRWQ3blh",
+                                            "Expression::Node": [
+                                                "Node_LE8VyMTsTY"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": [],
+                            "Activity::Resource": []
+                        }
+                    ],
+                    "ProcessDef::Expression": [
+                        {
+                            "Id": "Expression_j3vqCjDA0",
+                            "Kind": "Expression",
+                            "ExpressionStr": "Extend_btn=true() && Renew_btn=false() && Cancel_Contract_btn=false() ",
+                            "ProcessDef": "ProcessDef_ZgVYpZbcW",
+                            "Expression::Node": [
+                                "Node_J6p_eJyqgL"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "Id": "ProcessDef_9vGSYCmrx",
+                    "Kind": "ProcessDef",
+                    "Activity": "Activity_VK8ceZ66y",
+                    "ProcessDef::Activity": [
+                        {
+                            "Id": "Activity_e1miiEFlQ",
+                            "Kind": "Activity",
+                            "NodeType": "UserTask",
+                            "ProcessDef": "ProcessDef_9vGSYCmrx",
+                            "Name": "Renew",
+                            "Activity::Resource": [
+                                {
+                                    "Id": "Resource_RenLAPlrT",
+                                    "Kind": "Resource",
+                                    "ValueType": "Field",
+                                    "DisplayValue": "Created by",
+                                    "Field": "_created_by",
+                                    "Activity": "Activity_e1miiEFlQ"
+                                }
+                            ],
+                            "Activity::Permission": [
+                                "Permission_Z1NXrlICQ",
+                                "Permission_1x38QODrD",
+                                "Permission_T53FWbb2W",
+                                "Permission_RI2OHEk4M",
+                                "Permission_V9qvR86Ax",
+                                "Permission_sAD0-2PfU",
+                                "Permission_ii2elEA81",
+                                "Permission_wqk8u1Bxb",
+                                "Permission_DCPTuXOle",
+                                "Permission_YNAZoe9-q",
+                                "Permission_x1Q5k5enc",
+                                "Permission_5Fq6SZ_70",
+                                "Permission_MfSt3G12Q",
+                                "Permission_rBfoQlv58",
+                                "Permission_l_FuiGLzOR"
+                            ],
+                            "Goto::Activity": [
+                                "Activity__D0kWORyJ",
+                                "Activity_YU1nya-55",
+                                "Activity_kuXLKTbX8"
+                            ],
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_OWioOwgnWb",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "AND((State = \"Active\" || State = \"Expired\" || State = \"Renew\" || State = \"Extend\"), (Substate = \"Renew\" || Substate = \"Reject\" || Substate = \"Rejected\" || Substate = \"Approved\" || Substate = \"Under Review\" || Substate = \"None\" || Substate = \"Renew Rejected\" || Substate = \"Renew Approved\" || Substate = \"Extend Approved\")) && Ends_Expiration_Date.totext(\"yyyy-mm-dd\") != \"\" && Cancel_Contract_btn = false()",
+                                    "Activity": "Activity_e1miiEFlQ",
+                                    "Expression::Node": [
+                                        "Node_30-rYaAROu"
+                                    ]
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": []
+                        },
+                        {
+                            "Id": "Activity_kuXLKTbX8",
+                            "Kind": "Activity",
+                            "NodeType": "GotoTask",
+                            "ProcessDef": "ProcessDef_9vGSYCmrx",
+                            "Goto": "Activity_e1miiEFlQ|Renew",
+                            "Name": "Goto-Renew",
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_yCWUnZrl-",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "State=\"Expired\" && Substate=\"None\" && Select_Option_Draft=\"Submit Without Review\"",
+                                    "Activity": "Activity_kuXLKTbX8",
+                                    "Expression::Node": [
+                                        "Node_7bVtF5XVm5"
+                                    ]
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": [],
+                            "Activity::Resource": []
+                        },
+                        {
+                            "Id": "Activity_mikFOSG8J",
+                            "Kind": "Activity",
+                            "NodeType": "GotoTask",
+                            "ProcessDef": "ProcessDef_9vGSYCmrx",
+                            "Goto": "Activity_Hh-1xwaR_|Active Step",
+                            "Name": "Goto-Active Step",
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_xyXh_Insm",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "AND((State=\"Active\"|| State=\"Expired\" || State=\"Renew\"),(Substate=\"Extend\"||Substate=\"Reject\"||Substate=\"Approved\"||Substate=\"Renew Approved\"||Substate=\"Renew Rejected\" || Substate=\"Under Review\")) && Ends_Expiration_Date.totext(\"yyyy-mm-dd\")!=\"\" &&Cancel_Contract_btn=false() && (Extend_btn=true() || Renew_btn=true() || Cancel_Contract_btn=true()) && (Select_Option_Draft=\"Submit For Review\" || Select_Option_Draft=\"Submit Without Review\"))",
+                                    "Activity": "Activity_mikFOSG8J",
+                                    "Expression::Node": [
+                                        "Node_68u5tZg3g2"
+                                    ]
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": [],
+                            "Activity::Resource": []
+                        },
+                        {
+                            "Id": "Activity_-WytZP-jB",
+                            "Kind": "Activity",
+                            "NodeType": "GotoTask",
+                            "ProcessDef": "ProcessDef_9vGSYCmrx",
+                            "Goto": "Activity_Hh-1xwaR_|Active Step",
+                            "Name": "Goto-Active Step",
+                            "Activity::Expression": [
+                                {
+                                    "Id": "Expression_Uw-44CtRY",
+                                    "Kind": "Expression",
+                                    "ExpressionStr": "Select_Option_Draft=\"Submit For Review\" && State=\"Expired\" && Substate=\"None\"",
+                                    "Activity": "Activity_-WytZP-jB",
+                                    "Expression::Node": [
+                                        "Node_jxdVBDSHF9"
+                                    ]
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": [],
+                            "Activity::Resource": []
+                        },
+                        {
+                            "Id": "Activity_StyGA3Qo1",
+                            "Kind": "Activity",
+                            "Name": "ParallelActivity2",
+                            "NodeType": "Parallel",
+                            "ProcessDef": "ProcessDef_9vGSYCmrx",
+                            "Activity::ProcessDef": [
+                                {
+                                    "Id": "ProcessDef_8z5IP6YwiJ",
+                                    "Kind": "ProcessDef",
+                                    "Name": "Active Renew Approve",
+                                    "Activity": "Activity_StyGA3Qo1",
+                                    "ProcessDef::Activity": [
+                                        {
+                                            "Id": "Activity_16A2A1LRw",
+                                            "Kind": "Activity",
+                                            "NodeType": "UserTask",
+                                            "ProcessDef": "ProcessDef_8z5IP6YwiJ",
+                                            "Name": "Renew Approve",
+                                            "Activity::Resource": [
+                                                {
+                                                    "Id": "Resource_vaBzWe-0A",
+                                                    "Kind": "Resource",
+                                                    "ValueType": "Expression",
+                                                    "Activity": "Activity_16A2A1LRw",
+                                                    "Resource::Expression": [
+                                                        "Expression_k6G83G0DK"
+                                                    ],
+                                                    "DisplayValue": "userandgroup(Contract_Creator_Group)"
+                                                },
+                                                {
+                                                    "Id": "Resource_C8kffZRjZ",
+                                                    "Kind": "Resource",
+                                                    "ValueType": "Field",
+                                                    "DisplayValue": "Creator Group",
+                                                    "Field": "Creator_Group",
+                                                    "Activity": "Activity_16A2A1LRw"
+                                                }
+                                            ],
+                                            "Activity::Expression": [
+                                                {
+                                                    "Id": "Expression_0gPh7iluQ",
+                                                    "Kind": "Expression",
+                                                    "ExpressionStr": "Approving=\"Approve\"&& State=\"Active\" && Approver_State=\"Requested\"&& Cancel_Contract_btn=false()",
+                                                    "Activity": "Activity_16A2A1LRw",
+                                                    "Expression::Node": [
+                                                        "Node_ue7bVzyPUc"
+                                                    ]
+                                                }
+                                            ],
+                                            "Activity::Permission": [
+                                                "Permission_3plDEWVX2",
+                                                "Permission_yGf11kivD",
+                                                "Permission_xmrQC-Cdsq",
+                                                "Permission_7n0g0Wc2X"
+                                            ],
+                                            "ActivityDefaultSLA::SLA": []
+                                        },
+                                        {
+                                            "Id": "Activity__D0kWORyJ",
+                                            "Kind": "Activity",
+                                            "NodeType": "GotoTask",
+                                            "ProcessDef": "ProcessDef_8z5IP6YwiJ",
+                                            "Goto": "Activity_e1miiEFlQ|Renew",
+                                            "Name": "Goto-Renew",
+                                            "Activity::Expression": [
+                                                {
+                                                    "Id": "Expression_4NKhVo_I8",
+                                                    "Kind": "Expression",
+                                                    "ExpressionStr": "Substate=\"Renew Approved\" && Renew_btn=true()",
+                                                    "Activity": "Activity__D0kWORyJ",
+                                                    "Expression::Node": [
+                                                        "Node_JBtBzFUU9Q"
+                                                    ]
+                                                }
+                                            ],
+                                            "ActivityDefaultSLA::SLA": [],
+                                            "Activity::Resource": []
+                                        }
+                                    ],
+                                    "ProcessDef::Expression": []
+                                },
+                                {
+                                    "Id": "ProcessDef_iTqskxpFIh",
+                                    "Kind": "ProcessDef",
+                                    "Name": "Active Renew Reject",
+                                    "Activity": "Activity_StyGA3Qo1",
+                                    "ProcessDef::Activity": [
+                                        {
+                                            "Id": "Activity_Qms0IM_6e",
+                                            "Kind": "Activity",
+                                            "NodeType": "UserTask",
+                                            "ProcessDef": "ProcessDef_iTqskxpFIh",
+                                            "Name": "Renew Reject",
+                                            "Activity::Resource": [
+                                                {
+                                                    "Id": "Resource_D6X1OtZuT",
+                                                    "Kind": "Resource",
+                                                    "ValueType": "Expression",
+                                                    "Activity": "Activity_Qms0IM_6e",
+                                                    "Resource::Expression": [
+                                                        "Expression__xKEZiCws"
+                                                    ],
+                                                    "DisplayValue": "userandgroup(Contract_Creator_Group)"
+                                                },
+                                                {
+                                                    "Id": "Resource_wiOpxR9Ht",
+                                                    "Kind": "Resource",
+                                                    "ValueType": "Field",
+                                                    "DisplayValue": "Creator Group",
+                                                    "Field": "Creator_Group",
+                                                    "Activity": "Activity_Qms0IM_6e"
+                                                }
+                                            ],
+                                            "Activity::Expression": [
+                                                {
+                                                    "Id": "Expression_i887fiA6g",
+                                                    "Kind": "Expression",
+                                                    "ExpressionStr": "Approving=\"Reject\" && State=\"Active\"&& Cancel_Contract_btn=false()",
+                                                    "Activity": "Activity_Qms0IM_6e",
+                                                    "Expression::Node": [
+                                                        "Node_-m9qxCvTVj"
+                                                    ]
+                                                }
+                                            ],
+                                            "Activity::Permission": [
+                                                "Permission_EAQLNum1h",
+                                                "Permission_cGGZgu7yS",
+                                                "Permission_nlOyzMMig",
+                                                "Permission_FFcyp4lTd",
+                                                "Permission_bL9MARz-C"
+                                            ],
+                                            "ActivityDefaultSLA::SLA": []
+                                        },
+                                        {
+                                            "Id": "Activity_YU1nya-55",
+                                            "Kind": "Activity",
+                                            "NodeType": "GotoTask",
+                                            "ProcessDef": "ProcessDef_iTqskxpFIh",
+                                            "Goto": "Activity_e1miiEFlQ|Renew",
+                                            "Name": "Goto-Renew",
+                                            "Activity::Expression": [
+                                                {
+                                                    "Id": "Expression_tRo1N2q5i",
+                                                    "Kind": "Expression",
+                                                    "ExpressionStr": "Substate=\"Renew Rejected\" && Renew_btn=true()",
+                                                    "Activity": "Activity_YU1nya-55",
+                                                    "Expression::Node": [
+                                                        "Node_8U0Au-v6Mw"
+                                                    ]
+                                                }
+                                            ],
+                                            "ActivityDefaultSLA::SLA": [],
+                                            "Activity::Resource": []
+                                        }
+                                    ],
+                                    "ProcessDef::Expression": []
+                                }
+                            ],
+                            "ActivityDefaultSLA::SLA": [],
+                            "Activity::Resource": []
+                        }
+                    ],
+                    "Name": "Contract Renew",
+                    "ProcessDef::Expression": [
+                        {
+                            "Id": "Expression_82sJQiMqI",
+                            "Kind": "Expression",
+                            "ExpressionStr": "Renew_btn=true() && Extend_btn=false()&& Cancel_Contract_btn= false()",
+                            "ProcessDef": "ProcessDef_9vGSYCmrx",
+                            "Expression::Node": [
+                                "Node_ot6_m1WInP"
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "ActivityDefaultSLA::SLA": [],
+            "Activity::Resource": []
+        },
+        {
+            "Id": "Activity_NTACDgNGK",
+            "Kind": "Activity",
+            "NodeType": "UserTask",
+            "ProcessDef": "ProcessDef_SaXT0wX3Zo",
+            "Name": "Cancelled Contract",
+            "Activity::Resource": [
+                {
+                    "Id": "Resource_pBSf1EJKw",
+                    "Kind": "Resource",
+                    "ValueType": "Expression",
+                    "Activity": "Activity_NTACDgNGK",
+                    "Resource::Expression": [
+                        "Expression_Zp9_ePiPH"
+                    ],
+                    "DisplayValue": "userandgroup(Contract_Creator_Group)"
+                },
+                {
+                    "Id": "Resource_8mSPEZD6r",
+                    "Kind": "Resource",
+                    "ValueType": "Field",
+                    "DisplayValue": "Creator Group",
+                    "Field": "Creator_Group",
+                    "Activity": "Activity_NTACDgNGK"
+                }
+            ],
+            "Activity::Permission": [
+                "Permission_1lc0AgMYP",
+                "Permission_RRPRf48pm",
+                "Permission_QqojWaJzt",
+                "Permission_Xd_0dmIcj",
+                "Permission_PlV2A3D0O"
+            ],
+            "Activity::Expression": [
+                {
+                    "Id": "Expression_9oEXYdBjw",
+                    "Kind": "Expression",
+                    "ExpressionStr": "Cancel_Contract_btn=true()",
+                    "Activity": "Activity_NTACDgNGK",
+                    "Expression::Node": [
+                        "Node_aIypzZhLsw"
+                    ]
+                }
+            ],
+            "ActivityDefaultSLA::SLA": []
+        },
+        {
+            "Id": "Activity_X9Ksna57-",
+            "Kind": "Activity",
+            "NodeType": "UserTask",
+            "ProcessDef": "ProcessDef_SaXT0wX3Zo",
+            "Name": "Done",
+            "Activity::Resource": [
+                {
+                    "Id": "Resource_iMYJSuUAp",
+                    "Kind": "Resource",
+                    "ValueType": "Field",
+                    "DisplayValue": "Created by",
+                    "Field": "_created_by",
+                    "Activity": "Activity_X9Ksna57-"
+                }
+            ],
+            "Activity::Permission": [
+                "Permission_7Sfx4N1XC",
+                "Permission_r_-hyROJM",
+                "Permission_kY84b0ygw"
+            ],
+            "ActivityDefaultSLA::SLA": [],
+            "Activity::Expression": []
+        },
+        {
+            "Id": "Activity_btQzuiAvDn",
+            "Kind": "Activity",
+            "NodeType": "EndEvent",
+            "Name": "Completed",
+            "ProcessDef": "ProcessDef_SaXT0wX3Zo",
+            "ActivityDefaultSLA::SLA": [],
+            "Activity::Resource": [],
+            "Activity::Expression": []
+        }
+    ],
+    "ProcessDef::Expression": []
+}

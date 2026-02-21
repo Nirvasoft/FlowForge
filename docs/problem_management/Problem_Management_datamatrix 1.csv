@@ -1,0 +1,203 @@
+,id,name,type,required,formula,is_hidden,visibility_rules,referred_list,lookup_type,lookup_source,lookup_fields,lookup_hidden_fields,lookup_filter,under,Start,Goto-Known Error,Dummy Step Take,Open,Dummy Step Reopen,Open L1,Goto-Dummy Step Reopen,Open L2,Goto-Open,Known Error,Pending Change,Close/Resolve,Completed
+Number_1,Number_1,Number,Text,False,-,True,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,Hidden,Hidden,Hidden,ReadOnly,Hidden,ReadOnly,Hidden,Hidden,Hidden,Hidden
+State,State,State,Text,False,-,False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Business_service,Business_service,Business service,Reference,True,-,False,-,-,Dataset,Services,"Name, service_classification, name_1, parent_1, assignment_group, support_group, u_vendor_support_group","Name, service_classification, parent_1, assignment_group, support_group, u_vendor_support_group","Filter 1 - (Match All) :
+- service_classification EQUAL_TO Business Service-Value
+",Problem Management,Editable,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Impact,Impact,Impact,Select,True,-,False,-,Porb_Impact,-,-,-,-,-,Problem Management,Editable,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly
+Technical_service,Technical_service,Technical service,Reference,True,-,False,-,-,Dataset,Services,"Name, name_1, service_classification, parent_1, support_group, u_vendor_support_group, assignment_group","Name, service_classification, parent_1, support_group, u_vendor_support_group, assignment_group","Filter 1 - (Match All) :
+- service_classification EQUAL_TO Technical Service-Value
+- parent_1 EQUAL_TO Business_Service_Parent-Field
+",Problem Management,Editable,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Urgency,Urgency,Urgency,Select,True,-,False,-,Prob_Urgency,-,-,-,-,-,Problem Management,Editable,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly
+Change_request,Change_request,Change request,Reference,False,-,False,-,-,Process,Change_PEW,Name,-,-,Problem Management,Editable,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly
+Priority,Priority,Priority,Text,False,"if(Impact=""1 - High""&&Urgency=""1 - High"",""1 - Critical"",if(Impact=""1 - High""&&Urgency=""2 - Medium"",""2 - High"",if(Impact=""1 - High""&&Urgency=""3 - Low"",""3 - Minor"",if(Impact=""2 - Medium""&&Urgency=""1 - High"",""2 - High"",if(Impact=""2 - Medium""&&Urgency=""2 - Medium"",""3 - Minor"",if(Impact=""2 - Medium""&&Urgency=""3 - Low"",""4 - Low"",if(Impact=""3 - Low""&&Urgency=""1 - High"",""3 - Minor"",if(Impact=""3 - Low""&&Urgency=""2 - Medium"",""4 - Low"",if(Impact=""3 - Low""&&Urgency=""3 - Low"",""5 - Planning"","""")))))))))",False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Create_Knowledge,Create_Knowledge,Create Knowledge,Boolean,False,-,False,-,-,-,-,-,-,-,Problem Management,Editable,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,Editable,Editable,ReadOnly,ReadOnly
+Assignment_group,Assignment_group,Assignment group,Reference,True,-,True,"Field visibility rules - Match All: 
+- Choosing_Assignment_group_L2 EQUAL_TO false-Value
+",-,Dataset,sys_user_group,"Name, name_1",Name,"Filter 1 - (Match All) :
+- name_1 EQUAL_TO BS_Assign-Field
+- name_1 EQUAL_TO TEC_Assign-Field
+",Problem Management,Editable,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Editable,Editable,ReadOnly,ReadOnly
+Opened,Opened,Opened,DateTime,False,_created_at,False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Assigned_to,Assigned_to,Assigned to,Reference,False,-,False,-,-,Dataset,sys_user,"Name, email_1, name_1, usr_group","Name, name_1, usr_group","Filter 1 - (Match All) :
+- usr_group CONTAINS Assignment_Group_Name-Field
+- usr_group CONTAINS Assignment_Group_Name_L2-Field
+",Problem Management,Hidden,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,ReadOnly,ReadOnly
+Expected_Delivery_Time,Expected_Delivery_Time,Expected Delivery Time,DateTime,False,_created_at+14,False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Vendor_Contact,Vendor_Contact,Vendor Contact,Reference,False,-,False,-,-,Dataset,sys_user,"Name, email_1, usr_group, name_1","Name, email_1, usr_group","Filter 1 - (Match All) :
+- usr_group CONTAINS Assignment_Group_Name_L2-Field
+",Problem Management,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+PIC,PIC,PIC Contact,MultiUser,True,-,False,-,-,-,-,-,-,-,Problem Management,Editable,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,ReadOnly,ReadOnly
+Date_of_Actual_Production_Release,Date_of_Actual_Production_Release,Date of Actual Production Release,DateTime,False,-,False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,Editable,Editable,ReadOnly,ReadOnly
+Vendor_SLA_Success,Vendor_SLA_Success,Vendor SLA Success,Boolean,False,-,False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,Editable,Editable,ReadOnly,ReadOnly
+Short_description,Short_description,Short description,Textarea,True,-,False,-,-,-,-,-,-,-,Problem Management,Editable,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Description,Description,Description,Textarea,True,-,False,-,-,-,-,-,-,-,Problem Management,Editable,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Work_notes_list,Work_notes_list,Work notes list,User,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,Hidden,Hidden,Hidden,ReadOnly,Hidden,ReadOnly,Hidden,Hidden,ReadOnly,Hidden
+Work_notes,Work_notes,Work notes,Textarea,True,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,ReadOnly,Editable
+Root_Cause_Explanation,Root_Cause_Explanation,Root Cause Explanation,Textarea,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,ReadOnly,ReadOnly
+Preventive_Measures,Preventive_Measures,Preventive Measures,Textarea,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,ReadOnly,ReadOnly
+Solution_Details,Solution_Details,Solution Details,Textarea,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,ReadOnly,ReadOnly
+Actual_Date_for_Quotation_Information,Actual_Date_for_Quotation_Information,Actual Date for Quotation Information,DateTime,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Hidden,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly
+Estimated_Date_for_Quotation_Information,Estimated_Date_for_Quotation_Information,Estimated Date for Quotation Information,DateTime,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Hidden,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly
+Actual_Date_for_Implementation_Completion,Actual_Date_for_Implementation_Completion,Actual Date for Implementation Completion,DateTime,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Hidden,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly
+Estimated_Date_for_Implementation_Completion,Estimated_Date_for_Implementation_Completion,Estimated Date for Implementation Completion,DateTime,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Hidden,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly
+Actual_Date_for_GoLive,Actual_Date_for_GoLive,Actual Date for Go-Live,DateTime,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Hidden,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly
+Estimated_Date_for_GoLive,Estimated_Date_for_GoLive,Estimated Date for Go-Live,DateTime,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Hidden,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly
+Requirement_Settlement_Date,Requirement_Settlement_Date,Requirement Settlement Date,DateTime,False,_created_at,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Hidden,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly
+Closed_by,Closed_by,Closed by,Text,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Closed,Closed,Closed,DateTime,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Close_notes,Close_notes,Close notes,Textarea,True,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Hidden,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,Editable,Editable,ReadOnly,ReadOnly
+Related_Search_1,Related_Search_1,Related Search?,Reference,False,-,False,-,-,Dataset,KB_Knowledge,"Number_1, Category, Short_Description, Meta_Description_1, Active",Active,"Filter 1 - (Match All) :
+- Active EQUAL_TO 1-Value
+",Problem Management,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,Editable,ReadOnly
+Take,Take,Take,Boolean,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Hidden,ReadOnly,Editable,Editable,ReadOnly,ReadOnly
+Business_Service_Parent,Business_Service_Parent,Business Service Parent,Text,False,"Business_service.parent_1
+
+
+",True,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Technical_Service_Parent,Technical_Service_Parent,Technical Service Parent,Text,False,Technical_service.parent_1,True,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Configuration_Item,Configuration_Item,Configuration Item,Reference,False,-,False,-,-,Dataset,CI_Relationships,"parent_1, Name, child","parent_1, Name","Filter 1 - (Match All) :
+- parent_1 EQUAL_TO Technical_Service_Name-Field
+",Problem Management,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Service_Type,Service_Type,Service Type,Select,False,-,False,-,-,-,-,-,-,-,Problem Management,Editable,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+BS_Assign,BS_Assign,BS Assign,Text,False,"Business_service.assignment_group
+",True,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+BS_Support,BS_Support,BS Support,Text,False,Business_service.support_group,True,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+TEC_Assign,TEC_Assign,TEC Assign,Text,False,Technical_service.assignment_group,True,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+TEC_Support,TEC_Support,TEC Support,Text,False,Technical_service.support_group,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Assignment_Group_Name,Assignment_Group_Name,Assignment Group Name,Text,False,Assignment_group.name_1,True,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Technical_Service_Name,Technical_Service_Name,Technical Service Name,Text,False,Technical_service.name_1,True,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Outage,Outage,Outage,Text,False,-,False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly
+Type_1,Type_1,Type,Text,False,-,False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly
+Begin,Begin,Begin,Text,False,-,False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly
+End,End,End,Text,False,-,False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly
+Duration,Duration,Duration,Text,False,-,False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly
+Choosing_Assignment_group_L2,Choosing_Assignment_group_L2,Choosing Assignment group L2,Boolean,False,-,False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,ReadOnly,ReadOnly
+Assignment_group_L2,Assignment_group_L2,Assignment group L2,Reference,True,-,True,"Field visibility rules - Match All: 
+- Choosing_Assignment_group_L2 EQUAL_TO true-Value
+",-,Dataset,sys_user_group,"Name, name_1, u_service_level","Name, u_service_level","Filter 1 - (Match All) :
+- name_1 EQUAL_TO BS_Vendor_Support-Field
+- name_1 EQUAL_TO TEC_Support-Field
+",Problem Management,Hidden,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Hidden,Editable,ReadOnly,ReadOnly
+Known_Error,Known_Error,Known Error,Boolean,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Hidden,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Hidden,Hidden,ReadOnly,ReadOnly
+Pending_Change,Pending_Change,Pending Change,Boolean,False,-,True,"Field visibility rules - Match All: 
+- Take_Val EQUAL_TO Show-Value
+",-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Hidden,ReadOnly,Editable,ReadOnly,Hidden,ReadOnly,Editable,Hidden,ReadOnly,ReadOnly
+ClosedResolved,ClosedResolved,Closed/Resolved,Boolean,False,-,True,"Field visibility rules - Match All: 
+- Take_Val EQUAL_TO Show-Value
+- Take EQUAL_TO true-Value
+",-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Hidden,ReadOnly,Editable,ReadOnly,Hidden,ReadOnly,Editable,Editable,ReadOnly,ReadOnly
+Reopen,Reopen,Reopen,Boolean,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,Editable,Hidden,ReadOnly,ReadOnly
+Activity_Control_Validation,Activity_Control_Validation,Activity Control Validation,Text,False,"if(Known_Error=true()||ClosedResolved=true()||Pending_Change=true()||Choosing_Assignment_group_L2=true(),""DNS"",""Show"")",True,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Untitled_Field_1,Untitled_Field_1,Activity Control Validation 1,Text,False,"if(Activity_Control_Validation=""DNS"",""1"",""0"")",True,"Field visibility rules - Match All: 
+- Activity_Control_Validation EQUAL_TO DNS-Value
+",-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Problem_Tasks_Create,Problem_Tasks_Create,Problem Tasks Create,Boolean,False,-,False,-,-,-,-,-,-,-,Problem Management,Editable,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly
+Take_Val,Take_Val,Take Val,Text,False,"If(Take=true(),""Show"",""DNS"")",False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Assignment_Group_Name_L2,Assignment_Group_Name_L2,Assignment Group Name L2,Text,False,Assignment_group_L2.name_1,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Vendor_Contact_L3,Vendor_Contact_L3,Vendor Contact (L3),Reference,False,-,True,"Field visibility rules - Match All: 
+- Choosing_Assignment_group_L2 EQUAL_TO true-Value
+",-,Dataset,sys_user,"Name, name_1, usr_group, email_1","Name, usr_group, email_1","Filter 1 - (Match All) :
+- usr_group CONTAINS Assignment_Group_Name_L2-Field
+",Problem Management,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Reopen_Val,Reopen_Val,Reopen Val,Text,False,"if(Reopen=true(),""Show"",""DNS"")",False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+BS_Vendor_Support,BS_Vendor_Support,BS Vendor Support,Text,False,Business_service.u_vendor_support_group,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Root_Cause_Analysis,Root_Cause_Analysis,Root Cause Analysis,Boolean,False,-,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,ReadOnly,Hidden,ReadOnly,Hidden,ReadOnly,Editable,ReadOnly,Hidden,Hidden,Hidden,ReadOnly
+Root_Cause_Analysis_Val,Root_Cause_Analysis_Val,Root Cause Analysis Val,Text,False,"if(Root_Cause_Analysis=true(),""Root Cause Analysis"","""")",False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Untitled_Field_2,Untitled_Field_2,ID,Text,False,"concatenate(""PRB"",totext(_request_number+0040746,""0000000""))",False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Non_Kissflow_User,Non_Kissflow_User,Non Kissflow User?,Boolean,False,-,False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,Editable,ReadOnly
+PIC_Contact_Non_Kissflow_User,PIC_Contact_Non_Kissflow_User,PIC Contact (Non Kissflow User),Text,False,-,True,"Field visibility rules - Match All: 
+- Non_Kissflow_User EQUAL_TO true-Value
+",-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,Editable,Editable
+Assignment_Group_Service_Level,Assignment_Group_Service_Level,Assignment Group Service Level,Text,False,"Assignment_group_L2.u_service_level
+",False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+TASK_SLA_RESOLUTION,TASK_SLA_RESOLUTION,TASK SLA RESOLUTION,Reference,False,-,False,-,-,Dataset,contract_sla,"Name, Name_1, Table","Name, Table","Filter 1 - (Match All) :
+- Table EQUAL_TO problem-Value
+- Target EQUAL_TO Resolution-Value
+- Priority CONTAINS Priority_Text-Field
+- Assignment_Group CONTAINS Assignment_Group_Text-Field
+- Service_Type EQUAL_TO Service_Type_Text-Field
+",Problem Management,ReadOnly,ReadOnly,Editable,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,Editable,Editable
+Take_Val_1,Take_Val_1,Take Val 1,Text,False,"if(Take_Val=""Show"",""1"",""0"")",False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,Editable,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,Editable,Editable
+Management_Attachment,Management_Attachment,Management Attachment,Attachment,False,-,False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,Editable,Editable,Editable,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,Editable,ReadOnly
+Knowledge_Category,Knowledge_Category,Knowledge Category,Reference,False,-,False,-,-,Dataset,KB_Category,"Name, Category",-,"Filter 1 - (Match All) :
+- Name EQUAL_TO 3-Value
+",Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Knowledge_Valid_to,Knowledge_Valid_to,Knowledge Valid to,Date,False,"date(_modified_at.year()+2, _modified_at.month(), _modified_at.day())",False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Created_by_Email,Created_by_Email,Created by Email,Text,False,_created_by.Email,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Updated_by_Email,Updated_by_Email,Updated by Email,Text,False,_modified_by.Email,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Author,Author,Author,Text,False,"if(isBlank(_created_by.LastName), _created_by.FirstName, concatenate(_created_by.FirstName, "" "", _created_by.LastName))",False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Search_Result,Search_Result,Search Result,Text,False,Related_Search_1.Meta_Description_1,False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,Editable,ReadOnly
+Stored_Root_Cause,Stored_Root_Cause,Stored Root Cause ,Text,False,Root_Cause_Explanation,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Business_Service_Name,Business_Service_Name,Business Service Name,Text,False,Business_service.name_1,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Technical_Service_Name_1,Technical_Service_Name_1,Technical Service Name ,Text,False,Technical_service.name_1,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Assigned_to_Name,Assigned_to_Name,Assigned to Name,Text,False,Assigned_to.name_1,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+L2,L2,L2,Text,False,Technical_service.support_group,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+L3,L3,L3,Text,False,Technical_service.u_vendor_support_group,False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Default_assignment_group_L1,Default_assignment_group_L1,Default assignment group L1,Text,False,Business_service.assignment_group,True,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,Editable,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,Editable,Editable
+Support_group_L2,Support_group_L2,Support group L2,Text,False,Technical_service.support_group,True,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,Editable,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,Editable,Editable
+Assign_Group_L1,Assign_Group_L1,Assign Group L1,Text,False,-,True,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,Editable,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,Editable,Editable
+Assign_Group_L2,Assign_Group_L2,Assign Group L2,Text,False,-,True,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,Editable,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,Editable,Editable
+State_Button_Val,State_Button_Val,State Button Val,Text,False,"if(Known_Error=true()||ClosedResolved=true()||Pending_Change=true()||Reopen=true()||Root_Cause_Analysis=true()||Choosing_Assignment_group_L2=true(),""Show"",""DNS"")",False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+State_Button_Val_1,State_Button_Val_1,State Button Val 1,Text,False,"if(State_Button_Val=""Show"",""1"",""0"")",False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+State_Button_1,State_Button_1,State Button 1,Text,False,"if(ClosedResolved=true()||Pending_Change=true()||Reopen=true(),""Show"",""DNS"")",False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+State_Button_1_val,State_Button_1_val,State Button 1 val,Text,False,"if(State_Button_1=""Show"",""1"",""0"")",False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Word_Note_1,Word_Note_1,Work Note 1,Text,False,"if(not(isBlank(Work_notes)),Work_notes,"""")
+
+
+
+
+if(isBlank(Work_notes),"""",Work_notes)",False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+State_Button_2,State_Button_2,State Button 2,Text,False,"if(Known_Error=true()||Root_Cause_Analysis=true(),""Show"",""DNS"")",False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+State_Button_2_val,State_Button_2_val,State Button 2 val,Text,False,"if(State_Button_2=""Show"",""1"",""0"")",False,-,-,-,-,-,-,-,Problem Management,Hidden,ReadOnly,Hidden,ReadOnly,ReadOnly,ReadOnly,ReadOnly,Hidden,ReadOnly,ReadOnly,Hidden,Hidden,Hidden
+Assignment_Group_L2_Text,Assignment_Group_L2_Text,Assignment Group L2 Text,Text,False,Assignment_group_L2.name_1,False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Priority_Text,Priority_Text,Priority Text,Text,False,"if(not(isBlank(Priority)),Priority,""-"")",False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,Editable,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,Editable,Editable
+Assignment_Group_Text,Assignment_Group_Text,Assignment Group Text,Text,False,"if(Choosing_Assignment_group_L2 = true(), if(not(isBlank(Assignment_Group_L2_Text)), Assignment_Group_L2_Text, ""-""), if(not(isBlank(Assignment_group.name_1)), Assignment_group.name_1, ""-""))",False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,Editable,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,Editable,Editable
+Service_Type_Text,Service_Type_Text,Service Type Text,Text,False,"if(not(isBlank(Service_Type)),Service_Type,""-"")",False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,Editable,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,Editable,Editable
+FOUND_SLA,FOUND_SLA,FOUND SLA,Text,False,"if(not(isBlank(TASK_SLA_RESOLUTION)),""YES"",""NO"")",False,-,-,-,-,-,-,-,Problem Management,ReadOnly,ReadOnly,Editable,Editable,ReadOnly,Editable,ReadOnly,Editable,ReadOnly,Editable,Editable,Editable,Editable
+Number_3,Number_3,Number,Text,False,-,False,-,-,-,-,-,-,-,Incidents,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Active_1,Active_1,Active,Text,False,-,False,-,-,-,-,-,-,-,Incidents,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Activity_due_1,Activity_due_1,Activity due,Text,False,-,False,-,-,-,-,-,-,-,Incidents,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Additional_assignee_list_1,Additional_assignee_list_1,Additional assignee list,Text,False,-,False,-,-,-,-,-,-,-,Incidents,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Approval_1,Approval_1,Approval,Text,False,-,False,-,-,-,-,-,-,-,Incidents,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Approval_history_1,Approval_history_1,Approval history,Text,False,-,False,-,-,-,-,-,-,-,Incidents,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Approval_set_1,Approval_set_1,Approval set,Text,False,-,False,-,-,-,-,-,-,-,Incidents,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Assigned_to_3,Assigned_to_3,Assigned to,Text,False,-,False,-,-,-,-,-,-,-,Incidents,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Assignment_group_3,Assignment_group_3,Assignment group,Text,False,-,False,-,-,-,-,-,-,-,Incidents,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Business_duration_1,Business_duration_1,Business duration,Text,False,-,False,-,-,-,-,-,-,-,Incidents,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Number_4,Number_4,Number,Text,False,-,False,-,-,-,-,-,-,-,Problem Tasks,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Configuration_Item_2,Configuration_Item_2,Configuration Item,Reference,False,-,False,-,-,Dataset,MPTEmployeeMaster,OfficeEmailAddress,-,-,Problem Tasks,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Priority_2,Priority_2,Priority,Select,False,-,False,-,Porb_Impact,-,-,-,-,-,Problem Tasks,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Due_date,Due_date,Due date,Date,False,-,False,-,-,-,-,-,-,-,Problem Tasks,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Problem,Problem,Problem,Reference,False,-,False,-,-,Dataset,MPTEmployeeMaster,OfficeEmailAddress,-,-,Problem Tasks,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Assignment_group_1,Assignment_group_1,Assignment group,Reference,False,-,False,-,-,Dataset,MPTEmployeeMaster,OfficeEmailAddress,-,-,Problem Tasks,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Assigned_to_1,Assigned_to_1,Assigned to,Text,False,-,False,-,-,-,-,-,-,-,Problem Tasks,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Short_description_2,Short_description_2,Short description,Textarea,False,-,False,-,-,-,-,-,-,-,Problem Tasks,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Description_1,Description_1,Description,Textarea,False,-,False,-,-,-,-,-,-,-,Problem Tasks,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Work_notes_1,Work_notes_1,Work notes,Textarea,False,-,False,-,-,-,-,-,-,-,Problem Tasks,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Last_State,Last_State,Last State,Text,False,-,False,-,-,-,-,-,-,-,Notes History,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Modified_By,Modified_By,Modified By,Text,False,-,False,-,-,-,-,-,-,-,Notes History,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Modified_At_1,Modified_At_1,Modified At,Text,False,-,False,-,-,-,-,-,-,-,Notes History,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Work_Notes_3,Work_Notes_3,Work Notes,Textarea,False,-,False,-,-,-,-,-,-,-,Notes History,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Number_5,Number_5,Number,Text,False,-,True,-,-,-,-,-,-,-,Notes History,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Root_Cause_Explanation_1,Root_Cause_Explanation_1,Root Cause Explanation,Textarea,False,-,False,-,-,-,-,-,-,-,Notes History,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Preventive_Measures_1,Preventive_Measures_1,Preventive Measures,Textarea,False,-,False,-,-,-,-,-,-,-,Notes History,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Solution_Details_1,Solution_Details_1,Solution Details,Textarea,False,-,False,-,-,-,-,-,-,-,Notes History,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+FORM_ID,FORM_ID,FORM ID,Text,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+SLA_ID,SLA_ID,SLA ID,Text,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+SLA_DEFINITION,SLA_DEFINITION,SLA DEFINITION,Text,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+TABLE,TABLE,TABLE,Text,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+TYPE,TYPE,TYPE,Text,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+TARGET,TARGET,TARGET,Text,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+STAG,STAG,STAGE,Text,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+HAS_BREACHED,HAS_BREACHED,HAS BREACHED,Text,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+START_TIME,START_TIME,START TIME,DateTime,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+STOP_TIME,STOP_TIME,STOP TIME,DateTime,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+Untitled_Field,Untitled_Field,ORIGINAL BREACH TIME,DateTime,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+ACTUAL_BREACH_TIME,ACTUAL_BREACH_TIME,ACTUAL BREACH TIME,DateTime,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+BUSINESS_TIME_LEFT,BUSINESS_TIME_LEFT,BUSINESS TIME LEFT,Text,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+CREATED,CREATED,CREATED,DateTime,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+CREATED_BY,CREATED_BY,CREATED BY,Text,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+PAUSED_DURATION,PAUSED_DURATION,PAUSED DURATION,Text,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
+TOTAL_BREACH_TIME,TOTAL_BREACH_TIME,TOTAL BREACH TIME,Text,False,-,False,-,-,-,-,-,-,-,TASK SLA,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly,ReadOnly
