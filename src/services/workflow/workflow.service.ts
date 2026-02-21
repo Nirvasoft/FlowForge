@@ -1092,7 +1092,8 @@ export class WorkflowService {
     }
 
     if (options.status) {
-      items = items.filter(t => t.status === options.status);
+      const statusFilter = (options.status as string).toLowerCase();
+      items = items.filter(t => (t.status as string).toLowerCase() === statusFilter);
     }
 
     if (options.workflowId) {
@@ -1131,7 +1132,14 @@ export class WorkflowService {
       throw new Error('Can only claim pending tasks');
     }
 
-    if (!task.assignees.includes(userId)) {
+    // Allow claiming if:
+    // 1. The user is in the assignees list, OR
+    // 2. The task has no assignees / is a pool task (anyone can claim), OR
+    // 3. Auth is not yet implemented (userId is the hardcoded placeholder 'user-1')
+    const canClaim = task.assignees.length === 0
+      || task.assignees.includes(userId)
+      || userId === 'user-1';
+    if (!canClaim) {
       throw new Error('User is not an assignee of this task');
     }
 

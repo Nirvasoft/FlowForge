@@ -931,16 +931,16 @@ export function TaskInbox({
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="flex items-center gap-2 mt-0.5 text-sm text-surface-400 ml-6">
-                                                        <span className="uppercase text-[10px] tracking-wider font-semibold text-surface-500">
+                                                    <div className="flex items-center gap-2 mt-0.5 text-sm text-surface-400 ml-6 overflow-hidden">
+                                                        <span className="uppercase text-[10px] tracking-wider font-semibold text-surface-500 whitespace-nowrap">
                                                             {task.type || 'TASK'}
                                                         </span>
                                                         <span className="text-surface-600">·</span>
-                                                        <span>{timeAgo(task.createdAt)}</span>
+                                                        <span className="whitespace-nowrap">{timeAgo(task.createdAt)}</span>
                                                         {(task as any).workflowName && (
                                                             <>
                                                                 <span className="text-surface-600">·</span>
-                                                                <span className="text-surface-500 truncate max-w-[200px]">
+                                                                <span className="text-surface-500 truncate max-w-[180px] inline-block align-bottom">
                                                                     {(task as any).workflowName}
                                                                 </span>
                                                             </>
@@ -948,8 +948,8 @@ export function TaskInbox({
                                                         {task.dueAt && !overdue && (
                                                             <>
                                                                 <span className="text-surface-600">·</span>
-                                                                <span className="flex items-center gap-1 text-yellow-400">
-                                                                    <Calendar className="h-3 w-3" />
+                                                                <span className="flex items-center gap-1 text-yellow-400 whitespace-nowrap">
+                                                                    <Calendar className="h-3 w-3 flex-shrink-0" />
                                                                     Due {new Date(task.dueAt).toLocaleDateString()}
                                                                 </span>
                                                             </>
@@ -957,8 +957,8 @@ export function TaskInbox({
                                                         {task.dueAt && overdue && (
                                                             <>
                                                                 <span className="text-surface-600">·</span>
-                                                                <span className="flex items-center gap-1 text-red-400">
-                                                                    <AlertCircle className="h-3 w-3" />
+                                                                <span className="flex items-center gap-1 text-red-400 whitespace-nowrap">
+                                                                    <AlertCircle className="h-3 w-3 flex-shrink-0" />
                                                                     Was due {new Date(task.dueAt).toLocaleDateString()}
                                                                 </span>
                                                             </>
@@ -981,13 +981,13 @@ export function TaskInbox({
                                                             <>
                                                                 <span className="text-surface-600">·</span>
                                                                 <span className={cn(
-                                                                    'flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                                                                    'flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap',
                                                                     sla.urgency === 'overdue' ? 'text-red-400 bg-red-500/10'
                                                                         : sla.urgency === 'critical' ? 'text-orange-400 bg-orange-500/10'
                                                                             : sla.urgency === 'warning' ? 'text-yellow-400 bg-yellow-500/10'
                                                                                 : 'text-surface-400 bg-surface-700/50'
                                                                 )}>
-                                                                    <Clock3 className="h-3 w-3" />
+                                                                    <Clock3 className="h-3 w-3 flex-shrink-0" />
                                                                     {sla.text}
                                                                 </span>
                                                             </>

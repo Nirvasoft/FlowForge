@@ -102,57 +102,66 @@ export async function userRoutes(fastify: FastifyInstance): Promise<void> {
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
     const query = listQuerySchema.parse(request.query);
-    const result = await userService.listUsers(request.accountId!, {
-      page: query.page,
-      limit: query.limit,
-      sortBy: query.sortBy,
-      sortOrder: query.sortOrder,
-      status: query.status as UserStatus | undefined,
-      search: query.search,
-    });
+    const { page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc' } = query;
+    const skip = (page - 1) * limit;
 
-    // If account has more than just the current user, return as-is
-    if (result.data && result.data.length > 1) {
-      reply.send({
-        success: true,
-        data: result.data,
-        pagination: result.pagination,
-      });
-      return;
-    }
-
-    // Fallback: also include users from demo account for dev purposes
+    // Build the account filter: include demo account users for dev purposes
+    const accountIds = [request.accountId!];
     const demoAccount = await prisma.account.findUnique({ where: { slug: 'demo' } });
     if (demoAccount && demoAccount.id !== request.accountId) {
-      const demoResult = await userService.listUsers(demoAccount.id, {
-        page: query.page,
-        limit: query.limit,
-        sortBy: query.sortBy,
-        sortOrder: query.sortOrder,
-        status: query.status as UserStatus | undefined,
-        search: query.search,
-      });
-
-      // Merge current account user(s) with demo users
-      const allUsers = [...result.data, ...demoResult.data];
-      const total = result.pagination.total + demoResult.pagination.total;
-
-      reply.send({
-        success: true,
-        data: allUsers,
-        pagination: {
-          ...result.pagination,
-          total,
-          totalPages: Math.ceil(total / query.limit),
-        },
-      });
-      return;
+      accountIds.push(demoAccount.id);
     }
+
+    // Build where clause for combined query
+    const where: any = {
+      accountId: { in: accountIds },
+      ...(query.status && { status: query.status as UserStatus }),
+      ...(query.search && {
+        OR: [
+          { email: { contains: query.search, mode: 'insensitive' as const } },
+          { firstName: { contains: query.search, mode: 'insensitive' as const } },
+          { lastName: { contains: query.search, mode: 'insensitive' as const } },
+        ],
+      }),
+    };
+
+    // Single paginated query across both accounts
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { [sortBy]: sortOrder },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          displayName: true,
+          avatar: true,
+          status: true,
+          emailVerified: true,
+          lastLoginAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
 
     reply.send({
       success: true,
-      data: result.data,
-      pagination: result.pagination,
+      data: users,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
     });
   });
 
