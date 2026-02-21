@@ -417,6 +417,7 @@ export function TaskInbox({
             setCompletionWarning(null);
             setComments('');
             setJustClaimedId(null);
+            setExpandedTaskId(null);
             await loadTasks();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to complete task');
@@ -747,6 +748,16 @@ export function TaskInbox({
                                     {s === 'PENDING' && pendingCount > 0 && (
                                         <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-yellow-500/20 text-yellow-400">
                                             {pendingCount}
+                                        </span>
+                                    )}
+                                    {s === 'CLAIMED' && claimedCount > 0 && (
+                                        <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-blue-500/20 text-blue-400">
+                                            {claimedCount}
+                                        </span>
+                                    )}
+                                    {s === 'COMPLETED' && completedCount > 0 && (
+                                        <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-green-500/20 text-green-400">
+                                            {completedCount}
                                         </span>
                                     )}
                                 </button>
